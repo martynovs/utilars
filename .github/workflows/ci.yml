@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on the same ref (e.g. rapid pushes to a PR branch).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # Promote the workspace's warn-level pedantic lints to hard errors (CLAUDE.md §1 "zero
+  # warnings"). Cargo caps lints to `allow` for registry/git deps, so this only gates our code.
+  RUSTFLAGS: -D warnings
+
+jobs:
+  # `cargo fmt` is the canonical formatter (CLAUDE.md §3). Fail if anything is unformatted.
+  fmt:
+    name: rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all --check
+
+  # Pedantic clippy over the whole workspace + all targets. (src/generated.rs self-allows.)
+  clippy:
+    name: clippy (pedantic)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --workspace --all-targets
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # Doctests are disabled crate-wide (doctest = false), so plain `test` covers everything.
+      - run: cargo test --workspace
+
+  # MSRV: the published `rust-version` (1.91). Check the library builds on exactly that
+  # toolchain, against the committed lockfile. Scoped to the package (not dev tooling/examples,
+  # whose own MSRVs may be higher) and to default features (the optional `aws` feature pulls the
+  # AWS SDK, whose MSRV can exceed ours). RUSTFLAGS is relaxed: this gate is "does it compile on
+  # 1.91", not "is it warning-clean on 1.91".
+  msrv:
+    name: msrv (1.91)
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.91.0
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check -p utilars --locked
+
+  # Spec-drift gate (tasks 0.5 / V3). `src/generated.rs` is codegen output — never hand-edited —
+  # and must match a fresh regen from the committed spec. Regenerate hermetically (no network:
+  # `gen` reads the vendored openapi/utila.v2.json, unlike `pull`) and fail if either the
+  # generated client or its provenance sidecar drifts. Catches hand-edits to the generated file
+  # and a spec bumped without re-running codegen. RUSTFLAGS is relaxed: this gate proves output
+  # determinism, not warning-cleanliness (the clippy job already covers that).
+  gen-drift:
+    name: codegen drift
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo xtask gen
+      - name: Fail on drift
+        run: |
+          if ! git diff --exit-code src/generated.rs openapi/utila.v2.meta.json; then
+            echo "::error::Generated code is out of date. Run \`cargo xtask gen\` and commit the result." >&2
+            exit 1
+          fi
+
+  # CRAP gate (CLAUDE.md §2) + the per-function ≥90% coverage floor. Runs the project's own
+  # `just` recipes so CI can't drift from the local gates (the CRAP threshold lives in
+  # .cargo-crap.toml and the recipes read it from there).
+  crap:
+    name: crap + coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just,cargo-llvm-cov
+      - run: cargo install cargo-crap
+      - run: just crap-ci
+      - run: just coverage

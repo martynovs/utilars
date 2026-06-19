@@ -1,0 +1,5 @@
+# `cargo xtask <pull|gen>` — the conventional xtask alias. The README and `src/generated.rs`
+# header both document `cargo xtask gen`; this alias makes that command resolve (locally and in
+# CI) instead of requiring the longhand `cargo run -p xtask --`.
+[alias]
+xtask = "run -p xtask --"

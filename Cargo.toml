@@ -1,0 +1,155 @@
+[package]
+name = "utilars"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.91"
+license = "Apache-2.0 OR MIT"
+description = "Rust client for the Utila v2 API"
+readme = "README.md"
+repository = "https://github.com/martynovs/utilars"
+homepage = "https://github.com/martynovs/utilars"
+documentation = "https://docs.rs/utilars"
+# Guard against an accidental `cargo publish`. Flip to `publish = true` (or delete this
+# line) only when you intend to release to crates.io — see the "Releasing" steps in the PR/README.
+publish = false
+keywords = ["utila", "custody", "crypto", "api-client", "web3"]
+categories = ["api-bindings", "cryptography::cryptocurrencies"]
+# Ship only the crate — not the dev tooling (.claude/, .vscode/, openspec/, justfile, CLAUDE.md,
+# clippy/CRAP configs, xtask, tests). Whitelisted so new dev files can't leak into the package.
+# No `openapi/` files are shipped: the spec is codegen input for `xtask gen` (a dev tool), and
+# its provenance (sha256 + source URL) already travels in the `src/generated.rs` header. The
+# committed `openapi/utila.v2.json` + `openapi/utila.v2.meta.json` stay repo-only dev artifacts.
+include = [
+    "src/**/*.rs",
+    "examples/**/*.rs",
+    "README.md",
+    "LICENSE-*",
+]
+
+# Generated code (`src/generated.rs`) carries doc examples lifted from the OpenAPI
+# schema descriptions that don't compile as Rust doctests; disable doctests crate-wide.
+[lib]
+name = "utilars"
+doctest = false
+
+# Run with `cargo run --example utilars -- …`. Reads its own config from the env
+# (UTILA_ACCOUNT, UTILA_PRIVATE_KEY_PATH / UTILA_KMS_KEY_URL, …) — see its top-of-file docs.
+[[example]]
+name = "utilars"
+path = "examples/cli.rs"
+
+[dependencies]
+tokio = { version = "1", features = ["sync", "time"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "query", "stream", "rustls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+jsonwebtoken = { version = "10", default-features = false, features = ["rust_crypto", "use_pem"] }
+rust_decimal = { version = "1", features = ["macros"] }
+thiserror = "2"
+uuid = { version = "1", features = ["v4"] }
+futures = "0.3"
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+base64 = "0.22"
+# Webhook signature verification (RSA-4096 / SHA-512 / PSS — distinct from the PKCS#1-v1.5
+# auth signing). Pure-Rust, no native deps.
+#
+# Version lock (NOT staleness): `rsa` 0.9 is the latest *stable* (0.10 is a release candidate).
+# It's built on `digest 0.10`, so `sha2` MUST stay 0.10 — `sha2` 0.11 (digest 0.11) won't satisfy
+# `VerifyingKey::<Sha512>`. Likewise the dev-only `rand` is pinned to 0.8 (rand_core 0.6) for
+# `rsa`'s `RandomizedSigner`. All three move together when `rsa` 0.10 ships stable.
+rsa = "0.9"
+sha2 = "0.10"
+# Runtime support for the progenitor-generated core (src/generated.rs).
+progenitor-client = "0.14"
+bytes = "1"
+futures-core = "0.3"
+serde_urlencoded = "0.7"
+
+# `aws` feature: remote JWT signing via AWS KMS (RSASSA_PKCS1_V15_SHA_256). Off by default —
+# non-KMS users pull none of the AWS SDK. See `auth::Signer` / `auth::SignerSource`.
+aws-config = { version = "1", optional = true }
+aws-sdk-kms = { version = "1", optional = true }
+
+[features]
+aws = ["dep:aws-config", "dep:aws-sdk-kms"]
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time", "test-util"] }
+wiremock = "0.6"
+# Sign webhook payloads in tests to exercise the verifier end-to-end. Pinned to 0.8
+# (rand_core 0.6) to match `rsa` 0.9's `RandomizedSigner` — see the `rsa`/`sha2` note above.
+rand = "0.8"
+# Deps for the `utilars` demo CLI example (`examples/cli.rs`).
+clap = { version = "4", features = ["derive", "env"] }
+anyhow = "1"
+
+# Opt the package into the workspace lints below (without this they're inert).
+[lints]
+workspace = true
+
+[workspace]
+members = ["xtask"]
+
+[workspace.lints.rust]
+# Default deny — narrow `#[expect(unsafe_code, reason = "...")]` at a
+# specific block is permitted when the use case genuinely needs it
+# (extern "C" syscalls like setpriority via `Command::pre_exec` for
+# subprocess priority lowering — `forbid` cannot be overridden at
+# narrower scopes, which blocks even targeted opt-outs).
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+module_name_repetitions = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+# Builders chain `-> Self`; requiring #[must_use] on every setter is noise.
+return_self_not_must_use = "allow"
+must_use_candidate = "allow"
+
+# Stricter opt-in lints (https://emschwartz.me/your-clippy-config-should-be-stricter/)
+# Don't panic
+string_slice = "warn"
+indexing_slicing = "warn"
+unwrap_used = "warn"
+panic = "warn"
+todo = "warn"
+unimplemented = "warn"
+unreachable = "warn"
+get_unwrap = "warn"
+unwrap_in_result = "warn"
+unchecked_time_subtraction = "warn"
+panic_in_result_fn = "warn"
+# Don't fail silently
+let_underscore_future = "warn"
+let_underscore_must_use = "warn"
+unused_result_ok = "warn"
+map_err_ignore = "warn"
+assertions_on_result_states = "warn"
+# Async safety
+await_holding_lock = "warn"
+await_holding_refcell_ref = "warn"
+if_let_mutex = "warn"
+large_futures = "warn"
+# Memory safety
+mem_forget = "warn"
+undocumented_unsafe_blocks = "warn"
+multiple_unsafe_ops_per_block = "warn"
+unnecessary_safety_doc = "warn"
+unnecessary_safety_comment = "warn"
+# Numeric correctness
+float_cmp = "warn"
+float_cmp_const = "warn"
+lossy_float_literal = "warn"
+cast_sign_loss = "warn"
+invalid_upcast_comparisons = "warn"
+# General best practices
+rc_mutex = "warn"
+debug_assert_with_mut_call = "warn"
+iter_not_returning_iterator = "warn"
+expl_impl_clone_on_copy = "warn"
+infallible_try_from = "warn"
+dbg_macro = "warn"
+# Suppression discipline
+allow_attributes = "warn"
+allow_attributes_without_reason = "warn"
