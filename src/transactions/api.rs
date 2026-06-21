@@ -1,14 +1,15 @@
-//! The `transactions()` group: the `details` oneof as a typed enum and `initiate` as a
-//! builder, plus the read/action surface — get, list (page + stream), `batch_get`, cancel,
-//! publish, replace, vote, the latest simulation, AML screening, and fee estimation — all
-//! curated over `ClientTransactionsExt`.
+//! The `transactions()` group surface: the transaction model, the `Transactions` accessor, and
+//! its read/action builders (get, list/stream, `batch_get`, cancel, publish, replace, vote,
+//! latest simulation, AML screening, fee estimation). The `details` oneof and its per-kind input
+//! structs live in the sibling modules.
 
+use chrono::{DateTime, Utc};
 use futures::stream::{self, Stream, TryStreamExt};
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
 use crate::client::{enum_label, UtilaClient};
-use crate::error::{Result, UtilaError};
+use crate::error::{ApiError, Result};
 use crate::generated::types::{
     TransactionTransfer, TransactionsEstimateTransactionFeeBody,
     TransactionsInitiateTransactionBody, TransactionsPublishTransactionBody,
@@ -16,15 +17,21 @@ use crate::generated::types::{
     V2AddressBalanceChanges, V2BalanceChange, V2EstimateTransactionFeeResponse, V2EvmFeeEstimation,
     V2ListTransactionsResponse, V2Transaction, V2TransactionAmlScreening,
     V2TransactionPriorityEnum, V2TransactionReplacementTypeEnum, V2TransactionRequest,
-    V2TransactionSimulation, V2TronFeeEstimation, V2VoteOnTransactionRequestRequestVote,
+    V2TransactionSimulation, V2TransactionTypeEnum, V2TronFeeEstimation,
+    V2VoteOnTransactionRequestRequestVote,
 };
 use crate::generated::ClientTransactionsExt;
-use crate::ids::{AssetId, NetworkId, TransactionId, VaultId};
-use crate::tx_details::{
-    map_details, map_estimate_details, AssetTransfer, BatchAssetTransfer, EvmAccountDelegation,
-    EvmPersonalSign, EvmTransaction, EvmTypedData, ExchangeWithdrawal, SolanaRaw, StellarRaw,
-    StellarTransaction, SuiRaw, TransactionDetails, TronTransaction, TronTriggerSmartContract,
-    XrplRaw,
+use crate::resource::{
+    AssetId, NetworkId, ParseRef, ResourceName, SimulationRef, TransactionId, TransactionRef,
+    TransactionRequestRef, UserRef, VaultId, WalletRef,
+};
+use crate::webhook_event::TransactionState;
+
+use super::details::{map_details, map_estimate_details, TransactionDetails};
+use super::{
+    AssetTransfer, BatchAssetTransfer, EvmAccountDelegation, EvmPersonalSign, EvmTransaction,
+    EvmTypedData, ExchangeWithdrawal, SolanaRaw, StellarRaw, StellarTransaction, SuiRaw,
+    TronTransaction, TronTriggerSmartContract, XrplRaw,
 };
 
 /// Fee priority.
@@ -86,48 +93,80 @@ impl From<ReplacementType> for V2TransactionReplacementTypeEnum {
 /// payload.
 #[derive(Debug, Clone)]
 pub struct Transaction {
-    pub name: String,
+    /// The transaction's resource name (`vaults/{v}/transactions/{t}`), parsed to a
+    /// [`TransactionRef`] when it matches that shape.
+    pub name: ResourceName<TransactionRef>,
     pub network: Option<NetworkId>,
-    pub state: Option<String>,
-    /// The transaction `type` (`TRANSACTION` / `MESSAGE`).
-    pub kind: Option<String>,
+    pub state: Option<TransactionState>,
+    /// The transaction `type`.
+    pub kind: Option<TransactionKind>,
     pub sub_type: Option<String>,
     pub direction: Option<String>,
     pub hash: Option<String>,
-    pub block_number: Option<String>,
+    /// The block the transaction was mined in (the API sends it as a string; parsed to a number).
+    pub block_number: Option<u64>,
     pub note: Option<String>,
     pub spam: bool,
-    pub create_time: Option<String>,
-    pub confirm_time: Option<String>,
-    pub mine_time: Option<String>,
-    pub expire_time: Option<String>,
-    pub designated_signers: Vec<String>,
+    pub create_time: Option<DateTime<Utc>>,
+    pub confirm_time: Option<DateTime<Utc>>,
+    pub mine_time: Option<DateTime<Utc>>,
+    pub expire_time: Option<DateTime<Utc>>,
+    /// The users designated to sign this transaction (`users/{id}` or `users/{email}`).
+    pub designated_signers: Vec<ResourceName<UserRef>>,
     pub transfers: Vec<Transfer>,
     pub request: Option<TransactionRequest>,
-    pub replacement_transaction: Option<String>,
+    /// If this transaction was dropped, the transaction that replaced it.
+    pub replacement_transaction: Option<TransactionRef>,
 }
 
 impl From<V2Transaction> for Transaction {
     fn from(t: V2Transaction) -> Self {
         Self {
-            name: t.name.unwrap_or_default(),
+            name: ResourceName::parse(t.name.unwrap_or_default()),
             network: t.network.filter(|s| !s.is_empty()).map(NetworkId::from),
-            state: t.state.as_ref().and_then(enum_label),
-            kind: t.type_.as_ref().and_then(enum_label),
+            state: t.state.map(TransactionState::from),
+            kind: t.type_.map(TransactionKind::from),
             sub_type: t.sub_type.as_ref().and_then(enum_label),
             direction: t.direction.as_ref().and_then(enum_label),
             hash: t.hash.filter(|s| !s.is_empty()),
-            block_number: t.block_number.filter(|s| !s.is_empty()),
+            block_number: t.block_number.and_then(|s| s.parse().ok()),
             note: t.note.filter(|s| !s.is_empty()),
             spam: t.spam.unwrap_or(false),
-            create_time: t.create_time.map(|d| d.to_rfc3339()),
-            confirm_time: t.confirm_time.map(|d| d.to_rfc3339()),
-            mine_time: t.mine_time.map(|d| d.to_rfc3339()),
-            expire_time: t.expire_time.map(|d| d.to_rfc3339()),
-            designated_signers: t.designated_signers,
+            create_time: t.create_time,
+            confirm_time: t.confirm_time,
+            mine_time: t.mine_time,
+            expire_time: t.expire_time,
+            designated_signers: t
+                .designated_signers
+                .into_iter()
+                .map(ResourceName::parse)
+                .collect(),
             transfers: t.transfers.into_iter().map(Transfer::from).collect(),
             request: t.request.map(TransactionRequest::from),
-            replacement_transaction: t.replacement_transaction.filter(|s| !s.is_empty()),
+            replacement_transaction: t
+                .replacement_transaction
+                .as_deref()
+                .filter(|s| !s.is_empty())
+                .and_then(TransactionRef::parse),
+        }
+    }
+}
+
+/// What a transaction request represents.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum TransactionKind {
+    /// An on-chain transaction.
+    Transaction,
+    /// A message to sign (e.g. `personal_sign` / typed data).
+    Message,
+}
+
+impl From<V2TransactionTypeEnum> for TransactionKind {
+    fn from(t: V2TransactionTypeEnum) -> Self {
+        match t {
+            V2TransactionTypeEnum::Transaction => Self::Transaction,
+            V2TransactionTypeEnum::Message => Self::Message,
         }
     }
 }
@@ -136,8 +175,11 @@ impl From<V2Transaction> for Transaction {
 #[derive(Debug, Clone)]
 pub struct Transfer {
     pub asset: Option<AssetId>,
-    pub amount: Option<String>,
+    /// The amount moved, in DISPLAY units (whole tokens).
+    pub amount: Option<Decimal>,
+    /// The source's plain on-chain address (e.g. `0x…`, `G…`), not a Utila resource name.
     pub source_address: Option<String>,
+    /// The destination's plain on-chain address.
     pub destination_address: Option<String>,
     pub note: Option<String>,
 }
@@ -146,7 +188,7 @@ impl From<TransactionTransfer> for Transfer {
     fn from(t: TransactionTransfer) -> Self {
         Self {
             asset: t.asset.filter(|s| !s.is_empty()).map(AssetId::from),
-            amount: t.amount.filter(|s| !s.is_empty()),
+            amount: t.amount.and_then(|s| s.parse::<Decimal>().ok()),
             source_address: t
                 .source_address
                 .and_then(|a| a.value)
@@ -164,31 +206,39 @@ impl From<TransactionTransfer> for Transfer {
 /// client-supplied external id, and the lifecycle timestamps.
 #[derive(Debug, Clone)]
 pub struct TransactionRequest {
-    pub name: String,
+    pub name: ResourceName<TransactionRequestRef>,
     pub external_id: Option<String>,
-    pub initiator: Option<String>,
-    pub source_wallet: Option<String>,
+    /// The user who initiated the request (`users/{user}`).
+    pub initiator: Option<ResourceName<UserRef>>,
+    /// The wallet the request was initiated through, if any (`vaults/{v}/wallets/{w}`).
+    pub source_wallet: Option<ResourceName<WalletRef>>,
     pub origin: Option<String>,
-    pub approve_time: Option<String>,
-    pub sign_time: Option<String>,
-    pub publish_time: Option<String>,
-    pub cancel_time: Option<String>,
-    pub expire_time: Option<String>,
+    pub approve_time: Option<DateTime<Utc>>,
+    pub sign_time: Option<DateTime<Utc>>,
+    pub publish_time: Option<DateTime<Utc>>,
+    pub cancel_time: Option<DateTime<Utc>>,
+    pub expire_time: Option<DateTime<Utc>>,
 }
 
 impl From<V2TransactionRequest> for TransactionRequest {
     fn from(r: V2TransactionRequest) -> Self {
         Self {
-            name: r.name.unwrap_or_default(),
+            name: ResourceName::parse(r.name.unwrap_or_default()),
             external_id: r.external_id.filter(|s| !s.is_empty()),
-            initiator: r.initiator.filter(|s| !s.is_empty()),
-            source_wallet: r.source_wallet.filter(|s| !s.is_empty()),
+            initiator: r
+                .initiator
+                .filter(|s| !s.is_empty())
+                .map(ResourceName::parse),
+            source_wallet: r
+                .source_wallet
+                .filter(|s| !s.is_empty())
+                .map(ResourceName::parse),
             origin: r.origin.as_ref().and_then(enum_label),
-            approve_time: r.approve_time.map(|d| d.to_rfc3339()),
-            sign_time: r.sign_time.map(|d| d.to_rfc3339()),
-            publish_time: r.publish_time.map(|d| d.to_rfc3339()),
-            cancel_time: r.cancel_time.map(|d| d.to_rfc3339()),
-            expire_time: r.expire_time.map(|d| d.to_rfc3339()),
+            approve_time: r.approve_time,
+            sign_time: r.sign_time,
+            publish_time: r.publish_time,
+            cancel_time: r.cancel_time,
+            expire_time: r.expire_time,
         }
     }
 }
@@ -212,8 +262,8 @@ impl From<V2TransactionAmlScreening> for AmlScreening {
 /// A dry-run of a transaction: the projected per-address balance changes plus any error.
 #[derive(Debug, Clone)]
 pub struct Simulation {
-    pub name: String,
-    pub simulation_time: Option<String>,
+    pub name: ResourceName<SimulationRef>,
+    pub simulation_time: Option<DateTime<Utc>>,
     /// The simulation error message, if the simulation failed.
     pub error: Option<String>,
     pub balance_changes: Vec<AddressBalanceChange>,
@@ -222,8 +272,8 @@ pub struct Simulation {
 impl From<V2TransactionSimulation> for Simulation {
     fn from(s: V2TransactionSimulation) -> Self {
         Self {
-            name: s.name.unwrap_or_default(),
-            simulation_time: s.simulation_time.map(|d| d.to_rfc3339()),
+            name: ResourceName::parse(s.name.unwrap_or_default()),
+            simulation_time: s.simulation_time,
             error: s.error.and_then(|e| e.message).filter(|m| !m.is_empty()),
             balance_changes: s
                 .address_balance_changes
@@ -770,7 +820,7 @@ pub struct ReplaceBuilder<'a> {
     transaction: TransactionId,
     replacement: ReplacementType,
     note: Option<String>,
-    designated_signers: Vec<String>,
+    designated_signers: Vec<UserRef>,
 }
 
 impl ReplaceBuilder<'_> {
@@ -779,8 +829,8 @@ impl ReplaceBuilder<'_> {
         self.note = Some(note.into());
         self
     }
-    /// Designate specific signers (`users/{email}` or `users/{id}`).
-    pub fn designated_signers(mut self, signers: Vec<String>) -> Self {
+    /// Designate specific signers (build each with [`UserRef::new`], from a user id or email).
+    pub fn designated_signers(mut self, signers: Vec<UserRef>) -> Self {
         self.designated_signers = signers;
         self
     }
@@ -795,7 +845,7 @@ impl ReplaceBuilder<'_> {
             designated_signers,
         } = self;
         let body = TransactionsReplaceTransactionBody {
-            designated_signers,
+            designated_signers: designated_signers.iter().map(ToString::to_string).collect(),
             expire_time: None,
             include_referenced_resources: None,
             note,
@@ -878,7 +928,7 @@ fn transaction_stream(
             let token = match state {
                 PageState::First => None,
                 PageState::Next(t) => Some(t),
-                PageState::Done => return Ok::<_, UtilaError>(None),
+                PageState::Done => return Ok::<_, ApiError>(None),
             };
             let page = fetch_transactions(
                 client,
@@ -896,7 +946,7 @@ fn transaction_stream(
             let items = stream::iter(
                 page.transactions
                     .into_iter()
-                    .map(Ok::<Transaction, UtilaError>),
+                    .map(Ok::<Transaction, ApiError>),
             );
             Ok(Some((items, next)))
         }
@@ -936,8 +986,8 @@ async fn fetch_transactions(
 }
 
 /// A missing top-level response field surfaces as a synthetic API error.
-fn missing(field: &str) -> UtilaError {
-    UtilaError::missing(field)
+fn missing(field: &str) -> ApiError {
+    ApiError::missing(field)
 }
 
 #[cfg(test)]
@@ -950,6 +1000,18 @@ mod tests {
         assert!(matches!(E::from(Priority::Low), E::Low));
         assert!(matches!(E::from(Priority::Normal), E::Normal));
         assert!(matches!(E::from(Priority::High), E::High));
+    }
+
+    #[test]
+    fn transaction_kind_maps_both_variants() {
+        assert_eq!(
+            TransactionKind::from(V2TransactionTypeEnum::Transaction),
+            TransactionKind::Transaction
+        );
+        assert_eq!(
+            TransactionKind::from(V2TransactionTypeEnum::Message),
+            TransactionKind::Message
+        );
     }
 
     #[test]
@@ -970,7 +1032,7 @@ mod tests {
         UtilaClient::builder()
             .credential(
                 "a",
-                crate::auth::SignerSource::local_pem(include_bytes!("../tests/test_key.pem"))
+                crate::auth::SignerSource::local_pem(include_bytes!("../../tests/test_key.pem"))
                     .unwrap(),
             )
             .base_url("http://localhost")
@@ -1141,7 +1203,7 @@ mod tests {
                 v(),
                 TronTransaction::builder()
                     .network("tron-mainnet")
-                    .action(crate::tx_details::TronAction::WithdrawBalance {
+                    .action(crate::transactions::TronAction::WithdrawBalance {
                         owner_address: "T".into(),
                     })
                     .build()

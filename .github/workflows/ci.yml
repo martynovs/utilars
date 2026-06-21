@@ -91,7 +91,8 @@ jobs:
 
   # CRAP gate (CLAUDE.md §2) + the per-function ≥90% coverage floor. Runs the project's own
   # `just` recipes so CI can't drift from the local gates (the CRAP threshold lives in
-  # .cargo-crap.toml and the recipes read it from there).
+  # .cargo-crap.toml and the recipes read it from there). `just gate` collects coverage once
+  # and feeds both the CRAP gate and the coverage floor (vs. instrumenting the suite twice).
   crap:
     name: crap + coverage
     runs-on: ubuntu-latest
@@ -105,5 +106,4 @@ jobs:
         with:
           tool: just,cargo-llvm-cov
       - run: cargo install cargo-crap
-      - run: just crap-ci
-      - run: just coverage
+      - run: just gate

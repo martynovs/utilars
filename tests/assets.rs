@@ -62,7 +62,7 @@ async fn assets_get_missing_asset_is_api_error() {
         .await
         .unwrap_err();
     assert!(
-        matches!(err, utilars::UtilaError::Api { code: -1, .. }),
+        matches!(err, utilars::ApiError::Api { code: -1, .. }),
         "got: {err:?}"
     );
 }
@@ -147,5 +147,5 @@ async fn assets_get_for_vault_missing_is_typed_error() {
         )
         .await
         .unwrap_err();
-    assert!(matches!(err, utilars::UtilaError::Api { code: -1, .. }));
+    assert!(matches!(err, utilars::ApiError::Api { code: -1, .. }));
 }

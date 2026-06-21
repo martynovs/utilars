@@ -4,7 +4,7 @@ use common::client;
 use futures::TryStreamExt;
 use rust_decimal::dec;
 use serde_json::json;
-use utilars::{AssetTransfer, NetworkId, Priority, TransactionDetails, VaultId};
+use utilars::{AssetTransfer, NetworkId, Priority, TransactionDetails, UserRef, VaultId};
 use wiremock::matchers::{method, path, query_param, query_param_is_missing};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -46,7 +46,10 @@ async fn initiate_sends_exactly_one_detail_and_idempotency_key() {
         .unwrap();
 
     assert!(!out.request_id.is_empty());
-    assert_eq!(out.transaction.unwrap().name, "vaults/abc/transactions/t1");
+    assert_eq!(
+        out.transaction.unwrap().name.to_string(),
+        "vaults/abc/transactions/t1"
+    );
 
     // body had exactly one detail variant + an auto-generated requestId + HIGH priority
     let reqs = server.received_requests().await.unwrap();
@@ -110,6 +113,7 @@ async fn transactions_get_curates_core_fields() {
                 "direction": "OUTGOING",
                 "hash": "0xdead",
                 "spam": false,
+                "designatedSigners": ["users/me@example.com"],
                 "transfers": [{
                     "asset": "assets/native.ethereum-mainnet",
                     "amount": "1.5",
@@ -134,15 +138,17 @@ async fn transactions_get_curates_core_fields() {
         .await
         .unwrap();
 
-    assert_eq!(tx.name, "vaults/abc/transactions/tx1");
-    assert_eq!(tx.state.as_deref(), Some("MINED"));
-    assert_eq!(tx.kind.as_deref(), Some("TRANSACTION"));
+    assert_eq!(tx.name.to_string(), "vaults/abc/transactions/tx1");
+    assert_eq!(tx.state, Some(utilars::TransactionState::Mined));
+    assert_eq!(tx.kind, Some(utilars::TransactionKind::Transaction));
     assert_eq!(tx.sub_type.as_deref(), Some("NATIVE_TRANSFER"));
     assert_eq!(tx.direction.as_deref(), Some("OUTGOING"));
     assert_eq!(
         tx.network.as_ref().map(NetworkId::as_str),
         Some("networks/ethereum-mainnet")
     );
+    assert_eq!(tx.designated_signers.len(), 1);
+    assert_eq!(tx.designated_signers[0].to_string(), "users/me@example.com");
     assert_eq!(tx.transfers.len(), 1);
     assert_eq!(
         tx.transfers[0].destination_address.as_deref(),
@@ -178,8 +184,14 @@ async fn transactions_list_send_with_filter_and_pagination() {
         .await
         .unwrap();
 
-    assert_eq!(page.transactions[0].name, "vaults/abc/transactions/tx1");
-    assert_eq!(page.transactions[0].state.as_deref(), Some("SIGNED"));
+    assert_eq!(
+        page.transactions[0].name.to_string(),
+        "vaults/abc/transactions/tx1"
+    );
+    assert_eq!(
+        page.transactions[0].state,
+        Some(utilars::TransactionState::Signed)
+    );
     assert_eq!(page.next_page_token.as_deref(), Some("page2"));
     assert_eq!(page.total_size, 1);
 
@@ -216,7 +228,7 @@ async fn transactions_stream_walks_all_pages() {
         .transactions()
         .list(VaultId::new("abc"))
         .stream()
-        .map_ok(|t| t.name)
+        .map_ok(|t| t.name.to_string())
         .try_collect()
         .await
         .unwrap();
@@ -256,7 +268,7 @@ async fn transactions_batch_get_returns_all() {
         .await
         .unwrap();
     assert_eq!(txs.len(), 2);
-    assert_eq!(txs[1].name, "vaults/abc/transactions/tx2");
+    assert_eq!(txs[1].name.to_string(), "vaults/abc/transactions/tx2");
 }
 
 #[tokio::test]
@@ -291,7 +303,7 @@ async fn transactions_publish_returns_transaction() {
         .publish(VaultId::new("abc"), utilars::TransactionId::new("tx1"))
         .await
         .unwrap();
-    assert_eq!(tx.state.as_deref(), Some("PUBLISHED"));
+    assert_eq!(tx.state, Some(utilars::TransactionState::Published));
 }
 
 #[tokio::test]
@@ -313,11 +325,11 @@ async fn transactions_replace_with_note_sends_type() {
             utilars::ReplacementType::Accelerate,
         )
         .note("bump the fee")
-        .designated_signers(vec!["users/me@example.com".to_string()])
+        .designated_signers(vec![UserRef::new("me@example.com")])
         .send()
         .await
         .unwrap();
-    assert_eq!(tx.name, "vaults/abc/transactions/tx2");
+    assert_eq!(tx.name.to_string(), "vaults/abc/transactions/tx2");
 
     let reqs = server.received_requests().await.unwrap();
     let body: serde_json::Value = serde_json::from_slice(&reqs[0].body).unwrap();
@@ -375,7 +387,7 @@ async fn transactions_latest_simulation_curates_balance_changes() {
         .latest_simulation(VaultId::new("abc"), utilars::TransactionId::new("tx1"))
         .await
         .unwrap();
-    assert_eq!(sim.name, "vaults/abc/transactionSimulations/s1");
+    assert_eq!(sim.name.to_string(), "vaults/abc/transactionSimulations/s1");
     assert_eq!(sim.balance_changes[0].address.as_deref(), Some("0xaaa"));
     assert!(sim.balance_changes[0].changes[0].negative);
     assert_eq!(
@@ -425,8 +437,8 @@ async fn transactions_estimate_fee_with_priority() {
             VaultId::new("abc"),
             TransactionDetails::AssetTransfer(AssetTransfer {
                 asset: utilars::AssetId::new("assets/native.ethereum-mainnet"),
-                source: "vaults/abc/wallets/w1".to_string(),
-                destination: "0xbbb".to_string(),
+                source: "vaults/abc/wallets/w1".into(),
+                destination: "0xbbb".into(),
                 amount: dec!(1.5),
                 memo: None,
                 sponsor: None,
@@ -468,7 +480,7 @@ async fn transaction_get_missing_field_is_typed_error() {
         .get(VaultId::new("abc"), utilars::TransactionId::new("tx404"))
         .await
         .unwrap_err();
-    assert!(matches!(err, utilars::UtilaError::Api { code: -1, .. }));
+    assert!(matches!(err, utilars::ApiError::Api { code: -1, .. }));
 }
 
 #[tokio::test]
@@ -488,7 +500,7 @@ async fn transactions_stream_honors_starting_page_token() {
         .list(VaultId::new("abc"))
         .page_token("start")
         .stream()
-        .map_ok(|t| t.name)
+        .map_ok(|t| t.name.to_string())
         .try_collect()
         .await
         .unwrap();

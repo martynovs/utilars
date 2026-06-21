@@ -11,20 +11,22 @@
 use futures::stream::{self, Stream, TryStreamExt};
 
 use crate::client::{enum_label, UtilaClient};
-use crate::error::{Result, UtilaError};
+use crate::error::{ApiError, Result};
 use crate::generated::types::{
     V2BatchGetWalletAddressesResponse, V2BatchGetWalletsResponse, V2ListWalletAddressesResponse,
     V2ListWalletsResponse, V2Wallet, V2WalletAddress, WalletsArchiveWalletBody,
     WalletsBatchArchiveWalletsBody, WalletsBatchUnarchiveWalletsBody, WalletsUnarchiveWalletBody,
 };
 use crate::generated::ClientWalletsExt;
-use crate::ids::{AddressId, NetworkId, VaultId, WalletId};
+use crate::resource::{
+    AddressId, NetworkId, ResourceName, VaultId, WalletAddressRef, WalletId, WalletRef,
+};
 
 /// A wallet in a vault. `name` is the resource name, e.g.
 /// `vaults/{vault_id}/wallets/{wallet_id}`.
 #[derive(Debug, Clone)]
 pub struct Wallet {
-    pub name: String,
+    pub name: ResourceName<WalletRef>,
     pub display_name: Option<String>,
     /// Resource names of the networks enabled on the wallet (as returned, e.g.
     /// `networks/ethereum-mainnet`).
@@ -39,7 +41,7 @@ pub struct Wallet {
 impl From<V2Wallet> for Wallet {
     fn from(w: V2Wallet) -> Self {
         Self {
-            name: w.name.unwrap_or_default(),
+            name: ResourceName::parse(w.name.unwrap_or_default()),
             display_name: (!w.display_name.is_empty()).then_some(w.display_name),
             networks: w
                 .networks
@@ -58,7 +60,7 @@ impl From<V2Wallet> for Wallet {
 /// e.g. `vaults/{vault_id}/wallets/{wallet_id}/addresses/{address_id}`.
 #[derive(Debug, Clone)]
 pub struct WalletAddress {
-    pub name: String,
+    pub name: ResourceName<WalletAddressRef>,
     /// The blockchain address (read-only; populated once derived).
     pub address: Option<String>,
     pub display_name: Option<String>,
@@ -76,7 +78,7 @@ pub struct WalletAddress {
 impl From<V2WalletAddress> for WalletAddress {
     fn from(a: V2WalletAddress) -> Self {
         Self {
-            name: a.name.unwrap_or_default(),
+            name: ResourceName::parse(a.name.unwrap_or_default()),
             address: a.address.filter(|s| !s.is_empty()),
             display_name: a.display_name.filter(|s| !s.is_empty()),
             network: NetworkId::from(a.network),
@@ -158,7 +160,7 @@ impl<'a> Wallets<'a> {
             .await?;
         resp.wallet
             .map(Wallet::from)
-            .ok_or_else(|| UtilaError::missing("wallet"))
+            .ok_or_else(|| ApiError::missing("wallet"))
     }
 
     /// Create a wallet. Networks can be supplied up front via `.network(..)`, or added
@@ -273,7 +275,7 @@ impl<'a> Wallets<'a> {
             .await?;
         resp.wallet_address
             .map(WalletAddress::from)
-            .ok_or_else(|| UtilaError::missing("wallet address"))
+            .ok_or_else(|| ApiError::missing("wallet address"))
     }
 
     /// Generate a new address in a wallet for `network` (a `networks/{id}` resource name).
@@ -384,7 +386,7 @@ impl<'a> ListWalletsBuilder<'a> {
                 let token = match state {
                     PageState::First => None,
                     PageState::Next(t) => Some(t),
-                    PageState::Done => return Ok::<_, UtilaError>(None),
+                    PageState::Done => return Ok::<_, ApiError>(None),
                 };
                 let page = fetch_wallets(
                     client,
@@ -399,7 +401,7 @@ impl<'a> ListWalletsBuilder<'a> {
                     Some(t) => PageState::Next(t),
                     None => PageState::Done,
                 };
-                let items = stream::iter(page.wallets.into_iter().map(Ok::<Wallet, UtilaError>));
+                let items = stream::iter(page.wallets.into_iter().map(Ok::<Wallet, ApiError>));
                 Ok(Some((items, next)))
             }
         })
@@ -483,7 +485,7 @@ impl<'a> ListAddressesBuilder<'a> {
                 let token = match state {
                     PageState::First => None,
                     PageState::Next(t) => Some(t),
-                    PageState::Done => return Ok::<_, UtilaError>(None),
+                    PageState::Done => return Ok::<_, ApiError>(None),
                 };
                 let page =
                     fetch_addresses(client, &vault, &wallet, page_size, token.as_deref()).await?;
@@ -494,7 +496,7 @@ impl<'a> ListAddressesBuilder<'a> {
                 let items = stream::iter(
                     page.addresses
                         .into_iter()
-                        .map(Ok::<WalletAddress, UtilaError>),
+                        .map(Ok::<WalletAddress, ApiError>),
                 );
                 Ok(Some((items, next)))
             }
@@ -582,7 +584,7 @@ impl CreateWalletBuilder<'_> {
             .await?;
         resp.wallet
             .map(Wallet::from)
-            .ok_or_else(|| UtilaError::missing("wallet"))
+            .ok_or_else(|| ApiError::missing("wallet"))
     }
 }
 
@@ -631,7 +633,7 @@ impl CreateAddressBuilder<'_> {
             .await?;
         resp.wallet_address
             .map(WalletAddress::from)
-            .ok_or_else(|| UtilaError::missing("wallet address"))
+            .ok_or_else(|| ApiError::missing("wallet address"))
     }
 }
 

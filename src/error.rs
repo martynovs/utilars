@@ -1,10 +1,12 @@
 use thiserror::Error;
 
-pub type Result<T> = std::result::Result<T, UtilaError>;
+pub type Result<T> = std::result::Result<T, ApiError>;
 
-/// Everything that can go wrong talking to Utila.
+/// Everything that can go wrong **talking to the Utila API** — auth, transport, a server-returned
+/// status, or client configuration. Value/format problems that aren't API calls have their own
+/// errors instead (e.g. [`crate::AmountError`], or [`serde_json::Error`] from webhook decoding).
 #[derive(Debug, Error)]
-pub enum UtilaError {
+pub enum ApiError {
     /// Token minting / signing failed, or the credential is malformed.
     #[error("auth error: {0}")]
     Auth(String),
@@ -23,20 +25,16 @@ pub enum UtilaError {
         details: Vec<serde_json::Value>,
     },
 
-    /// An amount string could not be parsed or projected.
-    #[error("amount error: {0}")]
-    Amount(String),
-
     /// Missing or invalid client configuration.
     #[error("config error: {0}")]
     Config(String),
 }
 
-impl UtilaError {
+impl ApiError {
     /// A required field was absent from an otherwise-successful response. Synthetic
     /// (`code -1`, no `details`) — distinct from a real server-returned status.
     pub(crate) fn missing(field: &str) -> Self {
-        UtilaError::Api {
+        ApiError::Api {
             code: -1,
             message: format!("{field} missing in response"),
             details: Vec::new(),
@@ -45,30 +43,30 @@ impl UtilaError {
 
     /// Whether retrying the operation might plausibly succeed — transient transport
     /// failures and server-side "try again later" statuses, but not client mistakes
-    /// (bad request, not-found, auth). Shaped as `fn(&UtilaError) -> bool` so it drops
+    /// (bad request, not-found, auth). Shaped as `fn(&ApiError) -> bool` so it drops
     /// straight into a retry crate's predicate, e.g. with `backon`:
-    /// `op.retry(ExponentialBuilder::default()).when(UtilaError::is_retryable)`.
+    /// `op.retry(ExponentialBuilder::default()).when(ApiError::is_retryable)`.
     #[must_use]
     pub fn is_retryable(&self) -> bool {
         match self {
             // Connect/timeout are transient; a malformed request or decode is not.
-            UtilaError::Http(e) => e.is_timeout() || e.is_connect(),
+            ApiError::Http(e) => e.is_timeout() || e.is_connect(),
             // gRPC canonical codes (DEADLINE_EXCEEDED / RESOURCE_EXHAUSTED / UNAVAILABLE)
             // plus the HTTP-status fallback `parse_api_error` uses when there is no gRPC
             // status envelope in the body.
-            UtilaError::Api { code, .. } => matches!(*code, 4 | 8 | 14 | 429 | 500..=599),
-            UtilaError::Auth(_) | UtilaError::Amount(_) | UtilaError::Config(_) => false,
+            ApiError::Api { code, .. } => matches!(*code, 4 | 8 | 14 | 429 | 500..=599),
+            ApiError::Auth(_) | ApiError::Config(_) => false,
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::UtilaError;
+    use super::ApiError;
 
     #[test]
     fn is_retryable_classifies_codes_and_kinds() {
-        let api = |code| UtilaError::Api {
+        let api = |code| ApiError::Api {
             code,
             message: String::new(),
             details: Vec::new(),
@@ -78,8 +76,8 @@ mod tests {
         assert!(api(503).is_retryable());
         assert!(api(429).is_retryable());
         assert!(!api(5).is_retryable());
-        assert!(!UtilaError::Auth("nope".into()).is_retryable());
-        assert!(!UtilaError::Config("nope".into()).is_retryable());
+        assert!(!ApiError::Auth("nope".into()).is_retryable());
+        assert!(!ApiError::Config("nope".into()).is_retryable());
     }
 
     #[tokio::test]
@@ -90,6 +88,6 @@ mod tests {
             .send()
             .await
             .unwrap_err();
-        assert!(UtilaError::Http(e).is_retryable());
+        assert!(ApiError::Http(e).is_retryable());
     }
 }

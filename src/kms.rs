@@ -7,7 +7,7 @@
 
 use std::ops::Range;
 
-use crate::error::{Result, UtilaError};
+use crate::error::{ApiError, Result};
 
 /// A KMS key used for remote JWT signing. The cloud backend is explicit; each variant
 /// holds a validated identifier, not a raw URL.
@@ -28,7 +28,7 @@ impl KmsKey {
             let arn = rest.trim_start_matches('/');
             Ok(KmsKey::Aws(AwsKmsArn::parse(arn)?))
         } else {
-            Err(UtilaError::Config(format!(
+            Err(ApiError::Config(format!(
                 "unsupported KMS key URL scheme: {url} (expected awskms://)"
             )))
         }
@@ -60,7 +60,7 @@ impl AwsKmsArn {
     pub fn parse(arn: &str) -> Result<Self> {
         const PREFIX: &str = "arn:aws:kms:";
         let invalid = || {
-            UtilaError::Config(format!(
+            ApiError::Config(format!(
                 "invalid AWS KMS ARN: {arn} (expected arn:aws:kms:<region>:<account>:key/<id>)"
             ))
         };

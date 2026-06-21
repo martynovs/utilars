@@ -1,29 +1,30 @@
 //! The `vaults()` group: models, list (page + stream), and get — over the generated ops.
 
+use chrono::{DateTime, Utc};
 use futures::stream::{self, Stream, TryStreamExt};
 
 use crate::client::UtilaClient;
-use crate::error::{Result, UtilaError};
+use crate::error::{ApiError, Result};
 use crate::generated::types::{V2ListVaultsResponse, V2Vault};
 use crate::generated::ClientVaultsExt;
-use crate::ids::VaultId;
+use crate::resource::{ResourceName, VaultId, VaultRef};
 
 /// A Utila vault. `name` is the resource name, e.g. `vaults/abc123`.
 #[derive(Debug, Clone)]
 pub struct Vault {
-    pub name: String,
+    pub name: ResourceName<VaultRef>,
     pub display_name: Option<String>,
     pub archived: bool,
-    pub create_time: Option<String>,
+    pub create_time: Option<DateTime<Utc>>,
 }
 
 impl From<V2Vault> for Vault {
     fn from(v: V2Vault) -> Self {
         Self {
-            name: v.name.unwrap_or_default(),
+            name: ResourceName::parse(v.name.unwrap_or_default()),
             display_name: (!v.display_name.is_empty()).then_some(v.display_name),
             archived: v.archived.unwrap_or(false),
-            create_time: v.create_time.map(|t| t.to_rfc3339()),
+            create_time: v.create_time,
         }
     }
 }
@@ -68,7 +69,7 @@ impl<'a> Vaults<'a> {
             .await?;
         resp.vault
             .map(Vault::from)
-            .ok_or_else(|| UtilaError::missing("vault"))
+            .ok_or_else(|| ApiError::missing("vault"))
     }
 
     /// Stream every vault across all pages.
@@ -78,14 +79,14 @@ impl<'a> Vaults<'a> {
             let token = match state {
                 PageState::First => None,
                 PageState::Next(t) => Some(t),
-                PageState::Done => return Ok::<_, UtilaError>(None),
+                PageState::Done => return Ok::<_, ApiError>(None),
             };
             let page = fetch_page(client, token.as_deref()).await?;
             let next = match page.next_page_token {
                 Some(t) => PageState::Next(t),
                 None => PageState::Done,
             };
-            let items = stream::iter(page.vaults.into_iter().map(Ok::<Vault, UtilaError>));
+            let items = stream::iter(page.vaults.into_iter().map(Ok::<Vault, ApiError>));
             Ok(Some((items, next)))
         })
         .try_flatten()
@@ -161,13 +162,10 @@ mod tests {
             display_name: "Treasury".into(),
             name: Some("vaults/abc".into()),
         });
-        assert_eq!(full.name, "vaults/abc");
+        assert_eq!(full.name.to_string(), "vaults/abc");
         assert_eq!(full.display_name.as_deref(), Some("Treasury"));
         assert!(full.archived);
-        assert_eq!(
-            full.create_time.as_deref(),
-            Some("2021-02-03T04:05:06+00:00")
-        );
+        assert_eq!(full.create_time, Some(create_time));
 
         // The absent/empty branches: empty display → None, missing name/archived/time → defaults.
         let bare = Vault::from(V2Vault {
@@ -176,7 +174,7 @@ mod tests {
             display_name: String::new(),
             name: None,
         });
-        assert_eq!(bare.name, "");
+        assert_eq!(bare.name.to_string(), "");
         assert_eq!(bare.display_name, None);
         assert!(!bare.archived);
         assert_eq!(bare.create_time, None);

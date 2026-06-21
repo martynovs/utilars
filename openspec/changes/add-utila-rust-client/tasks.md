@@ -121,6 +121,73 @@ Notes (→) record where the build intentionally diverged from the original plan
   wrong key / bad-base64 / bad PEM / each event kind / verified-but-non-JSON. Bundled key
   asserted to parse as a valid RSA public key.
 
+### Phase 5c — follow-ups (webhook hardening)
+Surfaced by review (2026-06-20). Scheme confirmed byte-for-byte against Utila's live docs
+(`x-utila-signature`, RSA-PSS, SHA-512, salt=digest, standard base64, raw body, no
+timestamp) — the verifier core is correct. These close gaps between "self-consistent" and
+"provably conformant / on par with the API-side surface".
+- [ ] 5c.4 **Conformance fixture.** Every current test signs with the crate's own
+  `SigningKey<Sha512>`, so sign+verify share defaults — a salt/hash/base64 mismatch with
+  Utila's real output would still pass. Capture one real `(raw body, x-utila-signature,
+  production public key)` sample and add a test that verifies it against the bundled key.
+  Locks the wire format down and guards against future `rsa`-crate behavior changes.
+  → **Blocked** on real Utila data (same dependency as V2). Mitigated meanwhile: the scheme
+    was confirmed byte-for-byte against Utila's live docs, and 5c.5 now pins the bundled key.
+- [x] 5c.5 **Pin the bundled key.** Added `UTILA_WEBHOOK_PUBLIC_KEY_SHA256` (SHA-256 of the
+  key's canonical SPKI DER) + a `bundled_key_matches_pinned_fingerprint` test, so a stale or
+  typo'd PEM fails at build time instead of rejecting 100% of real webhooks silently.
+  Cross-checked against `openssl … -outform DER | dgst -sha256`.
+- [x] 5c.6 **Idempotency/replay guidance.** Added an "Idempotency / replay" section to the
+  module rustdoc: no timestamp in the scheme → verification proves authenticity not novelty →
+  dedupe on `Event::id`.
+- [x] 5c.7 **Full event details (fully typed enums).** Confirmed against Utila's live docs that
+  `details` is a *closed set of two shapes* — `transactionStateUpdated`/`newState` and
+  `transactionAmlScreeningResultReady`/`action`; the other four kinds send no `details`.
+  - **`Event` is one enum** (no separate `EventKind`/`EventDetails`/`Resource` types): `type`,
+    `resourceType`, and `resource` are correlated, so each variant carries everything that kind
+    implies — `TransactionCreated { id, vault, transaction }`,
+    `TransactionStateUpdated { id, vault, transaction, new_state }`,
+    `TransactionAmlScreeningResultReady { id, vault, transaction, action }`,
+    `WalletCreated { id, vault, wallet }`,
+    `WalletAddressCreated { id, vault, wallet, address }`, `Test { id, vault }`,
+    `Unknown { id, vault }`. Illegal kind/resource/detail pairings are unrepresentable.
+  - **Resource folded in + validated**: the `resource` path (fixed format per type) is decomposed
+    into typed ids (`VaultId`/`WalletId`/`AddressId`/`TransactionId`); a resource whose **shape or
+    vault** doesn't match the event's `type`/`vault` is a decode error (`*_of` helpers). `Event.vault`
+    is a `VaultId` (the `vaults/` prefix stripped to the bare id). `resourceType` is redundant with
+    `type` + the structured `resource`, so it isn't read.
+  - **Details required + path-named errors**: a `take_detail_field` helper digs `details.<outer>.<inner>`;
+    a missing object/field or wrong-shaped value is a hard error that **names the JSON path** (e.g.
+    ``invalid webhook detail field `transactionStateUpdated.newState`: invalid type: integer …``),
+    keeping serde's "what was unexpected". Tested.
+  - **Typed value enums**: `TransactionState` (17 states, mirrors `v2TransactionStateEnum`) and
+    `AmlAction` (DENY/ALLOW/ALERT), via a `wire_enum!` macro → `From<&str>` + `Deserialize`. Both
+    `#[non_exhaustive]` with a **unit `Unknown`** (no stored string — the caller still holds the
+    payload for logging), so the unknown path never allocates. Conversions from the generated
+    `V2*Enum` are hand-written direct variant matches.
+  - `#[non_exhaustive]` throughout; an unknown event `type` → `Event::Unknown { id, vault }` (keeps
+    `id` for dedup). The `Deserialize` intermediate (`Raw`) borrows its string fields as `&str`
+    (zero-copy — webhook fields are escape-free), allocating only what `Event` keeps.
+  - **Module split**: event types live in `src/webhook_event.rs` (re-exported from `webhook` so the
+    public path is unchanged); `webhook.rs` keeps verification. Its tests decode `Event` straight
+    from JSON (verification is orthogonal), so they need no signing.
+  - **Verification API**: `VerifiedEvent` → **`VerifiedPayload<'a>`**, a newtype wrapping a
+    zero-copy borrow of the caller's bytes; it impls `AsRef<[u8]>` for the verified bytes.
+    `verify_with_key` takes a pre-parsed **`WebhookKey`** (`from_pem` validates once) instead of
+    re-parsing a PEM per call; the bundled key is a `LazyLock<WebhookKey>` parsed once on first use.
+  - **Parsing lives on `Event`**: `Event::parse(impl AsRef<[u8]>) -> Result<Event>` (not a
+    `VerifiedPayload` method), so a verified payload parses directly via its `AsRef` —
+    `Event::parse(verified)` — and any byte source works too.
+  - Tested: every state/action wire value maps; unknown values → `Unknown`; unknown event type →
+    `EventKind::Unknown`; malformed known detail → decode error; `From<V2*Enum>` covers all variants.
+- [x] 5c.8 **Typed IDs on events — done (see 5c.7).** `Event.vault` is a `VaultId` and the
+  `resource` path is fully decomposed into `VaultId`/`WalletId`/`AddressId`/`TransactionId` inside
+  the `Resource` enum. The earlier "won't do" reasoning (resource names are `String` crate-wide)
+  was reversed once `resource` itself became typed: the webhook envelope is a structured, fixed
+  format with no arbitrary values, so the `vaults/` prefix is stripped to the bare id and the
+  whole resource is typed — consistent *within the webhook surface* and with `VaultId`'s
+  "bare segment" semantics.
+
 ## Phase 6 — Polish & publish
 - [x] 6.1 Demo CLI example — binary `utila` (source `examples/cli.rs`, `cargo run --example
   utila -- …`). Subcommands exercise the real surfaces: vaults (get + stream), wallets,

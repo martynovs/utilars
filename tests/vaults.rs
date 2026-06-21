@@ -30,7 +30,7 @@ async fn vaults_list_authenticates_and_parses() {
         .await
         .unwrap();
 
-    assert_eq!(page.vaults[0].name, "vaults/abc");
+    assert_eq!(page.vaults[0].name.to_string(), "vaults/abc");
     assert_eq!(page.next_page_token.as_deref(), Some("page2"));
 
     let reqs = server.received_requests().await.unwrap();
@@ -70,7 +70,7 @@ async fn vaults_stream_walks_all_pages() {
     let names: Vec<String> = client
         .vaults()
         .stream()
-        .map_ok(|v| v.name)
+        .map_ok(|v| v.name.to_string())
         .try_collect()
         .await
         .unwrap();
@@ -120,7 +120,7 @@ async fn vaults_stream_surfaces_mid_stream_error() {
     // Collect every yielded item (Ok and Err) to assert ordering.
     let results: Vec<_> = client.vaults().stream().collect().await;
     assert!(
-        matches!(results.as_slice(), [Ok(v), Err(_)] if v.name == "vaults/abc"),
+        matches!(results.as_slice(), [Ok(v), Err(_)] if v.name.to_string() == "vaults/abc"),
         "expected [Ok(abc), Err(_)], got {results:?}"
     );
 }
@@ -138,7 +138,7 @@ async fn vaults_get_by_typed_id() {
 
     let client = client(&server.uri());
     let vault = client.vaults().get(VaultId::new("abc")).await.unwrap();
-    assert_eq!(vault.name, "vaults/abc");
+    assert_eq!(vault.name.to_string(), "vaults/abc");
 }
 
 #[tokio::test]
@@ -163,7 +163,7 @@ async fn api_error_is_typed() {
         .await
         .unwrap_err();
     match err {
-        utilars::UtilaError::Api {
+        utilars::ApiError::Api {
             code,
             message,
             details,
@@ -196,5 +196,5 @@ async fn vault_get_missing_field_is_typed_error() {
         .get(VaultId::new("novault"))
         .await
         .unwrap_err();
-    assert!(matches!(err, utilars::UtilaError::Api { code: -1, .. }));
+    assert!(matches!(err, utilars::ApiError::Api { code: -1, .. }));
 }

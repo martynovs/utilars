@@ -53,7 +53,7 @@ async fn address_book_list_passes_filter_and_parses() {
     assert_eq!(page.total_size, 1);
     assert_eq!(page.next_page_token.as_deref(), Some("page2"));
     let e = &page.entries[0];
-    assert_eq!(e.name, "vaults/v1/addressBookEntries/e1");
+    assert_eq!(e.name.to_string(), "vaults/v1/addressBookEntries/e1");
     assert_eq!(e.display_name.as_deref(), Some("Cold Storage"));
     assert_eq!(e.address, "0xabc");
     assert_eq!(
@@ -63,10 +63,16 @@ async fn address_book_list_passes_filter_and_parses() {
     assert_eq!(e.note.as_deref(), Some("treasury"));
     assert!(e.tracked);
     assert_eq!(
-        e.associated_external_wallet.as_deref(),
+        e.associated_wallet
+            .as_ref()
+            .map(ToString::to_string)
+            .as_deref(),
         Some("vaults/v1/wallets/w1")
     );
-    assert_eq!(e.creator.as_deref(), Some("users/u1"));
+    assert_eq!(
+        e.creator.as_ref().map(ToString::to_string).as_deref(),
+        Some("users/u1")
+    );
     assert!(e.create_time.is_some());
 }
 
@@ -134,7 +140,7 @@ async fn address_book_stream_walks_all_pages() {
     let names: Vec<String> = client
         .address_book()
         .stream(VaultId::new("v1"))
-        .map_ok(|e| e.name)
+        .map_ok(|e| e.name.to_string())
         .try_collect()
         .await
         .unwrap();
@@ -174,7 +180,10 @@ async fn address_book_get_many_batches_by_name() {
         .await
         .unwrap();
     assert_eq!(entries.len(), 1);
-    assert_eq!(entries[0].name, "vaults/v1/addressBookEntries/e1");
+    assert_eq!(
+        entries[0].name.to_string(),
+        "vaults/v1/addressBookEntries/e1"
+    );
 }
 
 #[tokio::test]
@@ -207,8 +216,8 @@ async fn address_book_batch_create_returns_action() {
         )
         .await
         .unwrap();
-    assert_eq!(action.name, "vaults/v1/actions/a1");
-    assert_eq!(action.status.as_deref(), Some("PENDING"));
+    assert_eq!(action.name.to_string(), "vaults/v1/actions/a1");
+    assert_eq!(action.status, Some(utilars::VaultActionStatus::Pending));
     assert!(action.expire_time.is_some());
 }
 
@@ -235,7 +244,7 @@ async fn address_book_batch_create_missing_action_errors() {
         )
         .await
         .unwrap_err();
-    assert!(matches!(err, utilars::UtilaError::Api { code: -1, .. }));
+    assert!(matches!(err, utilars::ApiError::Api { code: -1, .. }));
 }
 
 #[tokio::test]
@@ -263,8 +272,11 @@ async fn address_book_batch_create_unsigned_returns_action() {
         )
         .await
         .unwrap();
-    assert_eq!(action.name, "vaults/v1/actions/a2");
-    assert_eq!(action.status.as_deref(), Some("AWAITING_SIGNATURE"));
+    assert_eq!(action.name.to_string(), "vaults/v1/actions/a2");
+    assert_eq!(
+        action.status,
+        Some(utilars::VaultActionStatus::AwaitingSignature)
+    );
 }
 
 #[tokio::test]
@@ -290,5 +302,5 @@ async fn address_book_batch_add_to_group_returns_action() {
         )
         .await
         .unwrap();
-    assert_eq!(action.name, "vaults/v1/actions/a3");
+    assert_eq!(action.name.to_string(), "vaults/v1/actions/a3");
 }

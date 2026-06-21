@@ -3,23 +3,28 @@
 //! the three mutating quorum operations (batch create, unsigned batch create, batch add
 //! to a group) that each return a pending [`VaultAction`].
 
+use chrono::{DateTime, Utc};
 use futures::stream::{self, Stream, TryStreamExt};
 
-use crate::client::{enum_label, UtilaClient};
-use crate::error::{Result, UtilaError};
+use crate::client::UtilaClient;
+use crate::error::{ApiError, Result};
 use crate::generated::types::{
     AddressBookBatchAddAddressBookEntriesToGroupBody, AddressBookBatchCreateAddressBookEntriesBody,
     AddressBookBatchCreateUnsignedAddressBookEntriesBody, V2AddressBookEntry,
     V2CreateAddressBookEntryRequest, V2ListAddressBookEntriesResponse, V2VaultAction,
+    V2VaultActionStatusEnum,
 };
 use crate::generated::ClientAddressBookExt;
-use crate::ids::{AddressBookEntryId, NetworkId, VaultId};
+use crate::resource::{
+    AddressBookEntryId, AddressBookEntryRef, NetworkId, ResourceName, UserRef, VaultActionRef,
+    VaultId, WalletRef,
+};
 
 /// A labelled external address tracked in a vault's address book. `name` is the resource
 /// name, e.g. `vaults/{vault_id}/addressBookEntries/{entry_id}`.
 #[derive(Debug, Clone)]
 pub struct AddressBookEntry {
-    pub name: String,
+    pub name: ResourceName<AddressBookEntryRef>,
     pub display_name: Option<String>,
     /// The blockchain address.
     pub address: String,
@@ -27,26 +32,28 @@ pub struct AddressBookEntry {
     pub note: Option<String>,
     /// Whether Utila tracks assets held by this address.
     pub tracked: bool,
-    /// The wallet this address is associated with (only set when `tracked`). Full resource
-    /// name, e.g. `vaults/{vault_id}/wallets/{wallet_id}`.
-    pub associated_external_wallet: Option<String>,
-    /// The user who created the entry, e.g. `users/{user_id}`.
-    pub creator: Option<String>,
-    pub create_time: Option<String>,
+    /// The Utila wallet this address is associated with (only set when `tracked`).
+    pub associated_wallet: Option<ResourceName<WalletRef>>,
+    /// The user who created the entry.
+    pub creator: Option<ResourceName<UserRef>>,
+    pub create_time: Option<DateTime<Utc>>,
 }
 
 impl From<V2AddressBookEntry> for AddressBookEntry {
     fn from(e: V2AddressBookEntry) -> Self {
         Self {
-            name: e.name.unwrap_or_default(),
+            name: ResourceName::parse(e.name.unwrap_or_default()),
             display_name: (!e.display_name.is_empty()).then_some(e.display_name),
             address: e.address,
             network: (!e.network.is_empty()).then(|| NetworkId::from(e.network)),
             note: e.note.filter(|s| !s.is_empty()),
             tracked: e.tracked.unwrap_or(false),
-            associated_external_wallet: e.associated_external_wallet.filter(|s| !s.is_empty()),
-            creator: e.creator.filter(|s| !s.is_empty()),
-            create_time: e.create_time.map(|t| t.to_rfc3339()),
+            associated_wallet: e
+                .associated_external_wallet
+                .filter(|s| !s.is_empty())
+                .map(ResourceName::parse),
+            creator: e.creator.filter(|s| !s.is_empty()).map(ResourceName::parse),
+            create_time: e.create_time,
         }
     }
 }
@@ -55,19 +62,56 @@ impl From<V2AddressBookEntry> for AddressBookEntry {
 /// resource name, e.g. `vaults/{vault_id}/actions/{action_id}`.
 #[derive(Debug, Clone)]
 pub struct VaultAction {
-    pub name: String,
-    pub status: Option<String>,
-    pub create_time: Option<String>,
-    pub expire_time: Option<String>,
+    pub name: ResourceName<VaultActionRef>,
+    pub status: Option<VaultActionStatus>,
+    pub create_time: Option<DateTime<Utc>>,
+    pub expire_time: Option<DateTime<Utc>>,
 }
 
 impl From<V2VaultAction> for VaultAction {
     fn from(a: V2VaultAction) -> Self {
         Self {
-            name: a.name.unwrap_or_default(),
-            status: a.status.as_ref().and_then(enum_label),
-            create_time: a.create_time.map(|t| t.to_rfc3339()),
-            expire_time: a.expire_time.map(|t| t.to_rfc3339()),
+            name: ResourceName::parse(a.name.unwrap_or_default()),
+            status: a.status.map(VaultActionStatus::from),
+            create_time: a.create_time,
+            expire_time: a.expire_time,
+        }
+    }
+}
+
+/// The lifecycle status of a pending quorum [`VaultAction`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum VaultActionStatus {
+    /// Awaiting quorum approval.
+    Pending,
+    /// Rejected by the quorum.
+    Rejected,
+    /// Approved; awaiting the required signatures.
+    AwaitingSignature,
+    /// Currently executing.
+    Running,
+    /// Completed successfully.
+    Finished,
+    /// Execution failed.
+    Failed,
+    /// Canceled before completion.
+    Canceled,
+    /// Expired before reaching quorum.
+    Expired,
+}
+
+impl From<V2VaultActionStatusEnum> for VaultActionStatus {
+    fn from(s: V2VaultActionStatusEnum) -> Self {
+        match s {
+            V2VaultActionStatusEnum::Pending => Self::Pending,
+            V2VaultActionStatusEnum::Rejected => Self::Rejected,
+            V2VaultActionStatusEnum::AwaitingSignature => Self::AwaitingSignature,
+            V2VaultActionStatusEnum::Running => Self::Running,
+            V2VaultActionStatusEnum::Finished => Self::Finished,
+            V2VaultActionStatusEnum::Failed => Self::Failed,
+            V2VaultActionStatusEnum::Canceled => Self::Canceled,
+            V2VaultActionStatusEnum::Expired => Self::Expired,
         }
     }
 }
@@ -287,7 +331,7 @@ fn entry_stream(
             let token = match state {
                 PageState::First => None,
                 PageState::Next(t) => Some(t),
-                PageState::Done => return Ok::<_, UtilaError>(None),
+                PageState::Done => return Ok::<_, ApiError>(None),
             };
             let page = fetch_entries(client, &vault, None, None, token.as_deref(), None).await?;
             let next = match page.next_page_token {
@@ -297,7 +341,7 @@ fn entry_stream(
             let items = stream::iter(
                 page.entries
                     .into_iter()
-                    .map(Ok::<AddressBookEntry, UtilaError>),
+                    .map(Ok::<AddressBookEntry, ApiError>),
             );
             Ok(Some((items, next)))
         }
@@ -341,5 +385,24 @@ async fn fetch_entries(
 fn require_action(action: Option<V2VaultAction>) -> Result<VaultAction> {
     action
         .map(VaultAction::from)
-        .ok_or_else(|| UtilaError::missing("vault action"))
+        .ok_or_else(|| ApiError::missing("vault action"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn vault_action_status_maps_every_variant() {
+        use V2VaultActionStatusEnum as E;
+        use VaultActionStatus as S;
+        assert_eq!(S::from(E::Pending), S::Pending);
+        assert_eq!(S::from(E::Rejected), S::Rejected);
+        assert_eq!(S::from(E::AwaitingSignature), S::AwaitingSignature);
+        assert_eq!(S::from(E::Running), S::Running);
+        assert_eq!(S::from(E::Finished), S::Finished);
+        assert_eq!(S::from(E::Failed), S::Failed);
+        assert_eq!(S::from(E::Canceled), S::Canceled);
+        assert_eq!(S::from(E::Expired), S::Expired);
+    }
 }

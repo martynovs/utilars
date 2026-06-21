@@ -378,11 +378,11 @@ async fn run(client: &UtilaClient, command: Command) -> Result<()> {
                 VaultId::new(vault),
                 AssetTransfer {
                     asset: AssetId::new(asset),
-                    source: from,
-                    destination: to,
+                    source: from.into(),
+                    destination: to.into(),
                     amount,
                     memo: note.clone(),
-                    sponsor,
+                    sponsor: sponsor.map(Into::into),
                     // Send the flag only when set (the server omits the default).
                     pay_fee_from_amount: pay_fee_from_amount.then_some(true),
                     stellar_memo: None,
@@ -527,7 +527,7 @@ fn verify_webhook(signature: &str) -> Result<()> {
         .read_to_end(&mut body)
         .context("reading the webhook body from stdin")?;
     let verified = utilars::webhook::verify(&body, signature).context("verifying the signature")?;
-    let event = verified.parse().context("parsing the event")?;
+    let event = utilars::webhook::Event::parse(verified).context("parsing the event")?;
     println!("signature OK");
     println!("{event:#?}");
     Ok(())

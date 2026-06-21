@@ -3,10 +3,10 @@
 //! cache used by the balances slice lives separately in [`crate::asset_cache`].
 
 use crate::client::UtilaClient;
-use crate::error::{Result, UtilaError};
+use crate::error::{ApiError, Result};
 use crate::generated::types::V2Asset;
 use crate::generated::ClientAssetsExt;
-use crate::ids::{AssetId, VaultId};
+use crate::resource::{AssetId, VaultId};
 
 /// An asset reference — either resolved with metadata, or just its id if it couldn't be
 /// looked up. Match on it to get decimals/symbol with no `Option`.
@@ -80,7 +80,7 @@ impl Assets<'_> {
             .await?;
         resp.asset
             .map(ResolvedAsset::from)
-            .ok_or_else(|| UtilaError::missing("asset"))
+            .ok_or_else(|| ApiError::missing("asset"))
     }
 
     /// Get a vault-scoped asset (an imported token or custom-chain token) by resource name.
@@ -97,7 +97,7 @@ impl Assets<'_> {
             .await?;
         resp.asset
             .map(ResolvedAsset::from)
-            .ok_or_else(|| UtilaError::missing("asset"))
+            .ok_or_else(|| ApiError::missing("asset"))
     }
 
     /// Get several assets at once by resource name. Assets the server doesn't return are

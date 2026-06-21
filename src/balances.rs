@@ -10,20 +10,24 @@
 
 use std::collections::HashMap;
 
+use chrono::{DateTime, Utc};
 use futures::stream::{self, Stream, TryStreamExt};
+use rust_decimal::Decimal;
 
 use crate::amount::Amount;
 use crate::assets::{Asset, ResolvedAsset};
-use crate::client::{enum_label, UtilaClient};
-use crate::error::{Result, UtilaError};
+use crate::client::UtilaClient;
+use crate::error::{ApiError, Result};
 use crate::generated::types::{
     Apiv2Utxo, BalancesQueryWalletAddressBalancesBody, BalancesQueryWalletBalancesBody,
     BalancesQueryWalletUtxOsBody, BalancesRefreshAssetAddressBalanceBody, V2Balance,
     V2QueryBalancesResponse, V2QueryWalletAddressBalancesResponse, V2QueryWalletBalancesResponse,
-    V2QueryWalletUtxOsResponse, V2RefreshAssetAddressBalanceResponse,
+    V2QueryWalletUtxOsResponse, V2RefreshAssetAddressBalanceResponse, V2UtxoState,
 };
 use crate::generated::ClientBalancesExt;
-use crate::ids::{AddressId, AssetId, NetworkId, VaultId, WalletId};
+use crate::resource::{
+    AddressId, AssetId, NetworkId, ResourceName, VaultId, WalletAddressRef, WalletId, WalletRef,
+};
 
 /// A vault balance for one asset. The exact base-unit `amount` is always present; a
 /// human-readable value needs the asset's decimals (available when `asset` is resolved).
@@ -37,7 +41,7 @@ pub struct Balance {
 /// A balance scoped to a single wallet (the `wallet` resource name it belongs to).
 #[derive(Debug, Clone)]
 pub struct WalletBalance {
-    pub wallet: String,
+    pub wallet: ResourceName<WalletRef>,
     pub asset: Asset,
     pub amount: Amount,
     pub frozen: Amount,
@@ -46,7 +50,7 @@ pub struct WalletBalance {
 /// A balance scoped to a single wallet address (the `wallet_address` resource name).
 #[derive(Debug, Clone)]
 pub struct WalletAddressBalance {
-    pub wallet_address: String,
+    pub wallet_address: ResourceName<WalletAddressRef>,
     pub asset: Asset,
     pub amount: Amount,
     pub frozen: Amount,
@@ -57,34 +61,54 @@ pub struct WalletAddressBalance {
 /// not a tracked asset id).
 #[derive(Debug, Clone)]
 pub struct Utxo {
-    pub wallet_address: String,
+    pub wallet_address: ResourceName<WalletAddressRef>,
     pub network: Option<NetworkId>,
     pub tx_hash: Option<String>,
     pub vout: u32,
-    /// Decimal value as returned by the API (precision included).
-    pub value: Option<String>,
-    /// Spending state — `AVAILABLE`, `LOCKED`, or `FROZEN`.
-    pub state: Option<String>,
+    /// Decimal value (precision included).
+    pub value: Option<Decimal>,
+    /// Spending state.
+    pub state: Option<UtxoState>,
+    /// The address's script type label, e.g. `BITCOIN_P2WPKH` (free-form; no fixed enum).
     pub script_type: Option<String>,
     pub confirmations: u32,
-    pub create_time: Option<String>,
+    pub create_time: Option<DateTime<Utc>>,
+}
+
+/// A UTXO's spending state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum UtxoState {
+    Available,
+    Locked,
+    Frozen,
+}
+
+impl From<V2UtxoState> for UtxoState {
+    fn from(s: V2UtxoState) -> Self {
+        match s {
+            V2UtxoState::Available => Self::Available,
+            V2UtxoState::Locked => Self::Locked,
+            V2UtxoState::Frozen => Self::Frozen,
+        }
+    }
 }
 
 impl From<Apiv2Utxo> for Utxo {
     fn from(u: Apiv2Utxo) -> Self {
         Self {
-            wallet_address: u.wallet_address.unwrap_or_default(),
+            wallet_address: ResourceName::parse(u.wallet_address.unwrap_or_default()),
             network: u.network.filter(|s| !s.is_empty()).map(NetworkId::from),
             tx_hash: u.tx_hash.filter(|s| !s.is_empty()),
             vout: u.vout.and_then(|v| u32::try_from(v).ok()).unwrap_or(0),
-            value: u.value.filter(|s| !s.is_empty()),
-            state: u.state.as_ref().and_then(enum_label),
+            value: u.value.and_then(|s| s.parse::<Decimal>().ok()),
+            state: u.state.map(UtxoState::from),
             script_type: u.script_type.filter(|s| !s.is_empty()),
             confirmations: u
                 .confirmations
                 .and_then(|v| u32::try_from(v).ok())
                 .unwrap_or(0),
-            create_time: u.create_time.map(|t| t.to_rfc3339()),
+            create_time: u.create_time,
         }
     }
 }
@@ -236,7 +260,7 @@ impl<'a> Balances<'a> {
                     .send()
             })
             .await?;
-        let bal = resp.balance.ok_or_else(|| UtilaError::missing("balance"))?;
+        let bal = resp.balance.ok_or_else(|| ApiError::missing("balance"))?;
         let names: Vec<String> = bal.asset.clone().into_iter().collect();
         let metas = self.client.asset_cache().resolve(self.client, &names).await;
         balance_from(bal, &metas)
@@ -420,7 +444,7 @@ fn wallet_balance_stream(
             let token = match state {
                 PageState::First => None,
                 PageState::Next(t) => Some(t),
-                PageState::Done => return Ok::<_, UtilaError>(None),
+                PageState::Done => return Ok::<_, ApiError>(None),
             };
             let page = fetch_wallet_balances(
                 client,
@@ -432,11 +456,7 @@ fn wallet_balance_stream(
             )
             .await?;
             let next = next_state(page.next_page_token);
-            let items = stream::iter(
-                page.balances
-                    .into_iter()
-                    .map(Ok::<WalletBalance, UtilaError>),
-            );
+            let items = stream::iter(page.balances.into_iter().map(Ok::<WalletBalance, ApiError>));
             Ok(Some((items, next)))
         }
     })
@@ -459,7 +479,7 @@ fn wallet_address_balance_stream(
             let token = match state {
                 PageState::First => None,
                 PageState::Next(t) => Some(t),
-                PageState::Done => return Ok::<_, UtilaError>(None),
+                PageState::Done => return Ok::<_, ApiError>(None),
             };
             let page = fetch_wallet_address_balances(
                 client,
@@ -475,7 +495,7 @@ fn wallet_address_balance_stream(
             let items = stream::iter(
                 page.balances
                     .into_iter()
-                    .map(Ok::<WalletAddressBalance, UtilaError>),
+                    .map(Ok::<WalletAddressBalance, ApiError>),
             );
             Ok(Some((items, next)))
         }
@@ -501,7 +521,7 @@ fn utxo_stream(
             let token = match state {
                 PageState::First => None,
                 PageState::Next(t) => Some(t),
-                PageState::Done => return Ok::<_, UtilaError>(None),
+                PageState::Done => return Ok::<_, ApiError>(None),
             };
             let page = fetch_utxos(
                 client,
@@ -516,7 +536,7 @@ fn utxo_stream(
             )
             .await?;
             let next = next_state(page.next_page_token);
-            let items = stream::iter(page.utxos.into_iter().map(Ok::<Utxo, UtilaError>));
+            let items = stream::iter(page.utxos.into_iter().map(Ok::<Utxo, ApiError>));
             Ok(Some((items, next)))
         }
     })
@@ -565,7 +585,7 @@ async fn fetch_wallet_balances(
         .into_iter()
         .map(|b| {
             Ok(WalletBalance {
-                wallet: b.wallet.unwrap_or_default(),
+                wallet: ResourceName::parse(b.wallet.unwrap_or_default()),
                 asset: resolve_asset(&metas, &b.asset.unwrap_or_default()),
                 amount: amount_from(b.raw_value)?,
                 frozen: amount_from(b.frozen_value)?,
@@ -616,7 +636,7 @@ async fn fetch_wallet_address_balances(
         .into_iter()
         .map(|b| {
             Ok(WalletAddressBalance {
-                wallet_address: b.wallet_address.unwrap_or_default(),
+                wallet_address: ResourceName::parse(b.wallet_address.unwrap_or_default()),
                 asset: resolve_asset(&metas, &b.asset.unwrap_or_default()),
                 amount: amount_from(b.raw_value)?,
                 frozen: amount_from(b.frozen_value)?,
@@ -687,7 +707,44 @@ fn resolve_asset(metas: &HashMap<String, ResolvedAsset>, asset_id: &str) -> Asse
 /// absent/empty as zero (the API omits zero-valued fields).
 fn amount_from(value: Option<String>) -> Result<Amount> {
     match value.filter(|s| !s.is_empty()) {
-        Some(s) => Amount::parse(&s),
+        // A malformed amount in an API response is a response-decode failure (client-side,
+        // synthetic code -1) — surface it through the API-result error type.
+        Some(s) => Amount::parse(&s).map_err(|e| ApiError::Api {
+            code: -1,
+            message: e.to_string(),
+            details: Vec::new(),
+        }),
         None => Ok(Amount::default()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn utxo_state_maps_every_variant() {
+        assert_eq!(
+            UtxoState::from(V2UtxoState::Available),
+            UtxoState::Available
+        );
+        assert_eq!(UtxoState::from(V2UtxoState::Locked), UtxoState::Locked);
+        assert_eq!(UtxoState::from(V2UtxoState::Frozen), UtxoState::Frozen);
+    }
+
+    #[test]
+    fn amount_from_handles_absent_empty_valid_and_bad() {
+        assert_eq!(amount_from(None).unwrap(), Amount::default());
+        // protojson omits zero-valued fields ⇒ empty string is zero
+        assert_eq!(amount_from(Some(String::new())).unwrap(), Amount::default());
+        assert_eq!(
+            amount_from(Some("42".into())).unwrap(),
+            Amount::from_base_units(42)
+        );
+        // A malformed amount surfaces as a synthetic API (response-decode) error.
+        assert!(matches!(
+            amount_from(Some("nope".into())),
+            Err(ApiError::Api { code: -1, .. })
+        ));
     }
 }

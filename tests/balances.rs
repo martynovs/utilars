@@ -93,7 +93,7 @@ async fn wallet_balances_send_enriches_and_sends_filters() {
 
     assert_eq!(page.next_page_token.as_deref(), Some("page2"));
     assert_eq!(page.total_size, 2);
-    assert_eq!(page.balances[0].wallet, "vaults/abc/wallets/w1");
+    assert_eq!(page.balances[0].wallet.to_string(), "vaults/abc/wallets/w1");
     match &page.balances[0].asset {
         Asset::Resolved(a) => {
             assert_eq!(a.symbol, "ETH");
@@ -196,7 +196,7 @@ async fn wallet_address_balances_send_enriches() {
 
     assert_eq!(page.total_size, 1);
     assert_eq!(
-        page.balances[0].wallet_address,
+        page.balances[0].wallet_address.to_string(),
         "vaults/abc/wallets/w1/addresses/a1"
     );
     match &page.balances[0].asset {
@@ -299,15 +299,18 @@ async fn wallet_utxos_send_parses_fields() {
     assert_eq!(page.next_page_token.as_deref(), Some("page2"));
     assert_eq!(page.total_size, 1);
     let u = &page.utxos[0];
-    assert_eq!(u.wallet_address, "vaults/abc/wallets/w1/addresses/a1");
+    assert_eq!(
+        u.wallet_address.to_string(),
+        "vaults/abc/wallets/w1/addresses/a1"
+    );
     assert_eq!(
         u.network.as_ref().unwrap().as_str(),
         "networks/bitcoin-mainnet"
     );
     assert_eq!(u.tx_hash.as_deref(), Some("deadbeef"));
     assert_eq!(u.vout, 2);
-    assert_eq!(u.value.as_deref(), Some("0.5"));
-    assert_eq!(u.state.as_deref(), Some("AVAILABLE"));
+    assert_eq!(u.value, Some(dec!(0.5)));
+    assert_eq!(u.state, Some(utilars::UtxoState::Available));
     assert_eq!(u.script_type.as_deref(), Some("P2WPKH"));
     assert_eq!(u.confirmations, 6);
 }
@@ -349,8 +352,8 @@ async fn wallet_utxos_stream_walks_all_pages() {
         .unwrap();
 
     assert_eq!(all.len(), 2);
-    assert_eq!(all[0].value.as_deref(), Some("0.1"));
-    assert_eq!(all[1].value.as_deref(), Some("0.2"));
+    assert_eq!(all[0].value, Some(dec!(0.1)));
+    assert_eq!(all[1].value, Some(dec!(0.2)));
 }
 
 #[tokio::test]
@@ -438,5 +441,5 @@ async fn refresh_missing_balance_is_typed_error() {
         .refresh_asset_address_balance(VaultId::new("abc"), utilars::AssetId::new("assets/x"), "0x")
         .await
         .unwrap_err();
-    assert!(matches!(err, utilars::UtilaError::Api { code: -1, .. }));
+    assert!(matches!(err, utilars::ApiError::Api { code: -1, .. }));
 }

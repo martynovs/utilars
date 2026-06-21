@@ -4,22 +4,23 @@
 
 use futures::stream::{self, Stream, TryStreamExt};
 
-use crate::client::{enum_label, UtilaClient};
-use crate::error::{Result, UtilaError};
+use crate::client::UtilaClient;
+use crate::error::{ApiError, Result};
 use crate::generated::types::{
     V2BatchContract, V2ListNetworksResponse, V2ListVaultNetworksResponse, V2Network,
+    V2NetworkStatusEnum,
 };
 use crate::generated::ClientBlockchainsExt;
-use crate::ids::{AssetId, NetworkId, VaultId};
+use crate::resource::{AssetId, NetworkId, NetworkRef, ResourceName, VaultId};
 
 /// A blockchain network Utila supports. `name` is the resource name, e.g.
 /// `networks/ethereum-mainnet`.
 #[derive(Debug, Clone)]
 pub struct Network {
-    pub name: String,
+    pub name: ResourceName<NetworkRef>,
     pub display_name: Option<String>,
     pub native_asset: Option<AssetId>,
-    pub status: Option<String>,
+    pub status: Option<NetworkStatus>,
     pub testnet: bool,
     pub custom: bool,
 }
@@ -27,12 +28,34 @@ pub struct Network {
 impl From<V2Network> for Network {
     fn from(n: V2Network) -> Self {
         Self {
-            name: n.name.unwrap_or_default(),
+            name: ResourceName::parse(n.name.unwrap_or_default()),
             display_name: n.display_name.filter(|s| !s.is_empty()),
             native_asset: n.native_asset.filter(|s| !s.is_empty()).map(AssetId::from),
-            status: n.status.as_ref().and_then(enum_label),
+            status: n.status.map(NetworkStatus::from),
             testnet: n.testnet.unwrap_or(false),
             custom: n.custom.unwrap_or(false),
+        }
+    }
+}
+
+/// A network's operational status.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum NetworkStatus {
+    /// Fully supported.
+    Active,
+    /// Temporarily disabled (e.g. under maintenance).
+    Disabled,
+    /// Supported but slated for removal.
+    Deprecated,
+}
+
+impl From<V2NetworkStatusEnum> for NetworkStatus {
+    fn from(s: V2NetworkStatusEnum) -> Self {
+        match s {
+            V2NetworkStatusEnum::Active => Self::Active,
+            V2NetworkStatusEnum::Disabled => Self::Disabled,
+            V2NetworkStatusEnum::Deprecated => Self::Deprecated,
         }
     }
 }
@@ -113,7 +136,7 @@ impl<'a> Networks<'a> {
             .await?;
         resp.network
             .map(Network::from)
-            .ok_or_else(|| UtilaError::missing("network"))
+            .ok_or_else(|| ApiError::missing("network"))
     }
 
     /// The latest batch (multicall) contract for a network.
@@ -184,14 +207,14 @@ fn network_stream(
             let token = match state {
                 PageState::First => None,
                 PageState::Next(t) => Some(t),
-                PageState::Done => return Ok::<_, UtilaError>(None),
+                PageState::Done => return Ok::<_, ApiError>(None),
             };
             let page = fetch_networks(client, vault.as_ref(), token.as_deref(), None).await?;
             let next = match page.next_page_token {
                 Some(t) => PageState::Next(t),
                 None => PageState::Done,
             };
-            let items = stream::iter(page.networks.into_iter().map(Ok::<Network, UtilaError>));
+            let items = stream::iter(page.networks.into_iter().map(Ok::<Network, ApiError>));
             Ok(Some((items, next)))
         }
     })
@@ -234,5 +257,26 @@ async fn fetch_networks(
             })
             .await?;
         Ok(resp.into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn network_status_maps_every_variant() {
+        assert_eq!(
+            NetworkStatus::from(V2NetworkStatusEnum::Active),
+            NetworkStatus::Active
+        );
+        assert_eq!(
+            NetworkStatus::from(V2NetworkStatusEnum::Disabled),
+            NetworkStatus::Disabled
+        );
+        assert_eq!(
+            NetworkStatus::from(V2NetworkStatusEnum::Deprecated),
+            NetworkStatus::Deprecated
+        );
     }
 }

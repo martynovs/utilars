@@ -87,7 +87,7 @@ Everything hangs off `UtilaClient` as grouped, typed sub-clients:
 | `client.balances()` | `query` · `query_wallet_balances` · `query_wallet_address_balances` · `query_wallet_utxos` · `refresh_asset_address_balance` |
 | `client.transactions()` | per-kind sends (`asset_transfer`, `evm`, `tron`, …) · `get` · `list`/`stream` · `batch_get` · `cancel` · `publish` · `replace` · `vote` · `estimate_fee` · `latest_simulation` · `aml_screening` |
 | `client.networks()` | `list`/`stream` · `get` · vault-scoped variants |
-| `client.address_book()` | `list`/`stream` · `get` · `create` · `delete` |
+| `client.address_book()` | `list`/`stream` · `get_many` · `batch_create` · `batch_create_unsigned` · `batch_add_to_group` |
 | `client.assets()` | `get` · `get_for_vault` · `batch_get` |
 
 Resource ids are **distinct newtypes** (`VaultId`, `WalletId`, `AssetId`, `NetworkId`,
@@ -170,12 +170,12 @@ Receiver-side verification of inbound webhooks — **RSA-4096 / SHA-512 / PSS** 
 body against Utila's published key (bundled, overridable), then a typed event:
 
 ```rust
-use utilars::webhook::{self, EventKind};
+use utilars::webhook::{self, Event};
 
 let verified = webhook::verify(raw_body, x_utila_signature)?; // checks the signature
-match verified.parse()?.kind {
-    EventKind::TransactionStateUpdated => { /* … */ }
-    EventKind::WalletAddressCreated    => { /* … */ }
+match Event::parse(verified)? {                              // VerifiedPayload: AsRef<[u8]>
+    Event::TransactionStateUpdated { transaction, new_state, .. } => { /* … */ }
+    Event::WalletAddressCreated { address, .. }                  => { /* … */ }
     _ => {}
 }
 ```
@@ -184,24 +184,24 @@ match verified.parse()?.kind {
 
 Retry is intentionally **not** built in — each call issues exactly one request. To retry,
 wrap an operation with a retry crate (e.g. [`backon`](https://docs.rs/backon)) and gate it on
-`UtilaError::is_retryable`, which classifies transient transport + server errors (timeouts,
+`ApiError::is_retryable`, which classifies transient transport + server errors (timeouts,
 connect failures, gRPC `4`/`8`/`14`, HTTP `429`/`5xx`):
 
 ```rust
 use backon::{ExponentialBuilder, Retryable};
-use utilars::UtilaError;
+use utilars::ApiError;
 
 let vault = (|| client.vaults().get(id.clone()))
     .retry(ExponentialBuilder::default())
-    .when(UtilaError::is_retryable)
+    .when(ApiError::is_retryable)
     .await?;
 ```
 
 ## Errors
 
-All fallible calls return `Result<T, UtilaError>`. `UtilaError::Api { code, message, details }`
+All fallible calls return `Result<T, ApiError>`. `ApiError::Api { code, message, details }`
 carries the gRPC status (including `details`); other variants cover auth, transport (`Http`),
-amount, and config failures.
+and config failures. (Amount parsing has its own `AmountError`.)
 
 ## Cargo features
 
@@ -258,7 +258,7 @@ it by hand (regenerate with `cargo xtask gen`). Before opening a PR, run the gat
 
 ```sh
 cargo clippy --workspace --all-targets   # pedantic; must be warning-free
-just crap-ci                             # complexity/coverage gate (threshold 30, ≥90% per-fn)
+just gate                                # CRAP gate (threshold 30) + per-fn ≥90% coverage floor
 cargo fmt --all                          # always last
 ```
 

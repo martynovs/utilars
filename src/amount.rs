@@ -1,7 +1,21 @@
 use rust_decimal::Decimal;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use thiserror::Error;
 
-use crate::error::{Result, UtilaError};
+/// Something went wrong parsing or projecting an [`Amount`]. A value/format problem — not an API
+/// call — so it's its own typed error rather than a [`crate::ApiError`] variant.
+#[derive(Debug, Error)]
+pub enum AmountError {
+    /// The base-unit string wasn't a non-negative integer that fits `u128`.
+    #[error("invalid base-unit amount {0:?}: {1}")]
+    Parse(String, std::num::ParseIntError),
+    /// The value exceeds `i128::MAX` and can't even be taken as a `Decimal` mantissa.
+    #[error("amount {0} too large to project to Decimal")]
+    TooLarge(u128),
+    /// The value overflows `Decimal`'s ~7.9e28 mantissa at the requested scale.
+    #[error("does not fit Decimal: {0}")]
+    Decimal(#[from] rust_decimal::Error),
+}
 
 /// An exact, integer amount in an asset's smallest base unit (e.g. wei, satoshi).
 ///
@@ -17,10 +31,13 @@ impl Amount {
 
     /// Parse a base-unit integer string as received from the API. Errors on
     /// non-integers and on values that exceed `u128`.
-    pub fn parse(s: &str) -> Result<Self> {
+    ///
+    /// # Errors
+    /// [`AmountError::Parse`] if `s` isn't a non-negative integer that fits `u128`.
+    pub fn parse(s: &str) -> std::result::Result<Self, AmountError> {
         s.parse::<u128>()
             .map(Amount)
-            .map_err(|e| UtilaError::Amount(format!("invalid base-unit amount {s:?}: {e}")))
+            .map_err(|e| AmountError::Parse(s.to_owned(), e))
     }
 
     /// Wrap a base-unit value you already hold as an integer.
@@ -36,15 +53,17 @@ impl Amount {
     /// Project to a human-readable [`Decimal`] given the asset's `decimals`. Errors if
     /// the value exceeds `Decimal`'s ~7.9e28 mantissa (the exact `value()` is still
     /// available).
-    pub fn to_decimal(&self, decimals: u32) -> Result<Decimal> {
-        let mantissa = i128::try_from(self.0).map_err(|e| {
-            UtilaError::Amount(format!(
-                "amount {} too large to project to Decimal: {e}",
-                self.0
-            ))
-        })?;
-        Decimal::try_from_i128_with_scale(mantissa, decimals)
-            .map_err(|e| UtilaError::Amount(format!("does not fit Decimal: {e}")))
+    ///
+    /// # Errors
+    /// [`AmountError::TooLarge`] if the value exceeds `i128::MAX`, or [`AmountError::Decimal`] if it
+    /// overflows `Decimal`'s mantissa at `decimals` scale.
+    pub fn to_decimal(&self, decimals: u32) -> std::result::Result<Decimal, AmountError> {
+        #[expect(
+            clippy::map_err_ignore,
+            reason = "TooLarge carries the offending value; the TryFromIntError adds nothing"
+        )]
+        let mantissa = i128::try_from(self.0).map_err(|_| AmountError::TooLarge(self.0))?;
+        Ok(Decimal::try_from_i128_with_scale(mantissa, decimals)?)
     }
 }
 

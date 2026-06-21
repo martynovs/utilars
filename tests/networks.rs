@@ -25,8 +25,14 @@ async fn networks_list_and_stream() {
     let client = client(&server.uri());
 
     let page = client.networks().list().page_size(50).send().await.unwrap();
-    assert_eq!(page.networks[0].name, "networks/ethereum-mainnet");
-    assert_eq!(page.networks[0].status.as_deref(), Some("ACTIVE"));
+    assert_eq!(
+        page.networks[0].name.to_string(),
+        "networks/ethereum-mainnet"
+    );
+    assert_eq!(
+        page.networks[0].status,
+        Some(utilars::NetworkStatus::Active)
+    );
     assert_eq!(
         page.networks[0].native_asset.as_ref().unwrap().as_str(),
         "assets/native.ethereum-mainnet"
@@ -36,7 +42,7 @@ async fn networks_list_and_stream() {
     let all: Vec<String> = client
         .networks()
         .stream()
-        .map_ok(|n| n.name)
+        .map_ok(|n| n.name.to_string())
         .try_collect()
         .await
         .unwrap();
@@ -124,7 +130,7 @@ async fn networks_get_missing_field_is_typed_error() {
         .get(NetworkId::new("none"))
         .await
         .unwrap_err();
-    assert!(matches!(err, utilars::UtilaError::Api { code: -1, .. }));
+    assert!(matches!(err, utilars::ApiError::Api { code: -1, .. }));
 }
 
 #[tokio::test]
@@ -151,7 +157,7 @@ async fn networks_stream_walks_multiple_pages() {
     let all: Vec<String> = client
         .networks()
         .stream()
-        .map_ok(|n| n.name)
+        .map_ok(|n| n.name.to_string())
         .try_collect()
         .await
         .unwrap();

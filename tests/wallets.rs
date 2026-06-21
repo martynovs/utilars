@@ -42,7 +42,7 @@ async fn wallets_list_authenticates_parses_and_paginates() {
         .await
         .unwrap();
 
-    assert_eq!(page.wallets[0].name, "vaults/v1/wallets/w1");
+    assert_eq!(page.wallets[0].name.to_string(), "vaults/v1/wallets/w1");
     assert_eq!(page.wallets[0].display_name.as_deref(), Some("Hot"));
     assert_eq!(page.wallets[0].networks.len(), 2);
     assert_eq!(
@@ -89,7 +89,7 @@ async fn wallets_stream_walks_all_pages() {
         .wallets()
         .list(VaultId::new("v1"))
         .stream()
-        .map_ok(|w| w.name)
+        .map_ok(|w| w.name.to_string())
         .try_collect()
         .await
         .unwrap();
@@ -113,7 +113,7 @@ async fn wallets_get_parses() {
         .get(VaultId::new("v1"), utilars::WalletId::new("w1"))
         .await
         .unwrap();
-    assert_eq!(wallet.name, "vaults/v1/wallets/w1");
+    assert_eq!(wallet.name.to_string(), "vaults/v1/wallets/w1");
     assert_eq!(wallet.display_name.as_deref(), Some("Cold"));
     assert!(wallet.archived);
 }
@@ -156,7 +156,7 @@ async fn wallets_create_sends_body_and_parses() {
         .send()
         .await
         .unwrap();
-    assert_eq!(wallet.name, "vaults/v1/wallets/new");
+    assert_eq!(wallet.name.to_string(), "vaults/v1/wallets/new");
 
     let reqs = server.received_requests().await.unwrap();
     let body: serde_json::Value = reqs[0].body_json().unwrap();
@@ -317,7 +317,7 @@ async fn wallet_addresses_list_and_stream() {
         .wallets()
         .list_addresses(VaultId::new("v1"), utilars::WalletId::new("w1"))
         .stream()
-        .map_ok(|a| a.name)
+        .map_ok(|a| a.name.to_string())
         .try_collect()
         .await
         .unwrap();
@@ -388,7 +388,7 @@ async fn wallet_address_create_sends_body() {
         .send()
         .await
         .unwrap();
-    assert_eq!(addr.name, "vaults/v1/wallets/w1/addresses/new");
+    assert_eq!(addr.name.to_string(), "vaults/v1/wallets/w1/addresses/new");
 
     let reqs = server.received_requests().await.unwrap();
     let body: serde_json::Value = reqs[0].body_json().unwrap();
@@ -425,7 +425,10 @@ async fn wallet_addresses_batch_get_parses() {
         .await
         .unwrap();
     assert_eq!(addrs.len(), 2);
-    assert_eq!(addrs[0].name, "vaults/v1/wallets/w1/addresses/a1");
+    assert_eq!(
+        addrs[0].name.to_string(),
+        "vaults/v1/wallets/w1/addresses/a1"
+    );
 }
 
 #[tokio::test]
@@ -446,7 +449,7 @@ async fn wallet_address_get_missing_is_typed_error() {
         )
         .await
         .unwrap_err();
-    assert!(matches!(err, utilars::UtilaError::Api { code: -1, .. }));
+    assert!(matches!(err, utilars::ApiError::Api { code: -1, .. }));
 }
 
 #[tokio::test]
@@ -464,7 +467,7 @@ async fn wallet_create_missing_wallet_is_typed_error() {
         .send()
         .await
         .unwrap_err();
-    assert!(matches!(err, utilars::UtilaError::Api { code: -1, .. }));
+    assert!(matches!(err, utilars::ApiError::Api { code: -1, .. }));
 }
 
 #[tokio::test]
@@ -486,5 +489,5 @@ async fn wallet_create_address_missing_is_typed_error() {
         .send()
         .await
         .unwrap_err();
-    assert!(matches!(err, utilars::UtilaError::Api { code: -1, .. }));
+    assert!(matches!(err, utilars::ApiError::Api { code: -1, .. }));
 }

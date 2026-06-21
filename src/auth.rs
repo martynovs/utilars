@@ -8,7 +8,7 @@ use serde::Serialize;
 use tokio::sync::RwLock;
 use tokio::time::Instant;
 
-use crate::error::{Result, UtilaError};
+use crate::error::{ApiError, Result};
 use crate::kms::KmsKey;
 
 /// The JWT `aud` Utila requires — a fixed constant, NOT derived from the base URL.
@@ -30,7 +30,7 @@ struct LocalRsaSigner<'a> {
 impl Signer for LocalRsaSigner<'_> {
     async fn sign(&self, signing_input: &[u8]) -> Result<String> {
         jsonwebtoken::crypto::sign(signing_input, self.key, Algorithm::RS256)
-            .map_err(|e| UtilaError::Auth(format!("sign failed: {e}")))
+            .map_err(|e| ApiError::Auth(format!("sign failed: {e}")))
     }
 }
 
@@ -57,10 +57,10 @@ impl Signer for AwsKmsSigner<'_> {
             .signing_algorithm(SigningAlgorithmSpec::RsassaPkcs1V15Sha256)
             .send()
             .await
-            .map_err(|e| UtilaError::Auth(format!("AWS KMS sign failed: {e}")))?;
+            .map_err(|e| ApiError::Auth(format!("AWS KMS sign failed: {e}")))?;
         let sig = out
             .signature()
-            .ok_or_else(|| UtilaError::Auth("AWS KMS returned no signature".into()))?;
+            .ok_or_else(|| ApiError::Auth("AWS KMS returned no signature".into()))?;
         Ok(B64.encode(sig.as_ref()))
     }
 }
@@ -85,7 +85,7 @@ impl SignerSource {
     pub fn local_pem(pem: &[u8]) -> Result<Self> {
         EncodingKey::from_rsa_pem(pem)
             .map(SignerSource::Local)
-            .map_err(|e| UtilaError::Auth(format!("invalid RSA private key: {e}")))
+            .map_err(|e| ApiError::Auth(format!("invalid RSA private key: {e}")))
     }
 }
 
@@ -218,9 +218,9 @@ impl TokenManager {
             typ: "JWT",
         };
         let header_json = serde_json::to_vec(&header)
-            .map_err(|e| UtilaError::Auth(format!("encode header: {e}")))?;
+            .map_err(|e| ApiError::Auth(format!("encode header: {e}")))?;
         let claims_json = serde_json::to_vec(&claims)
-            .map_err(|e| UtilaError::Auth(format!("encode claims: {e}")))?;
+            .map_err(|e| ApiError::Auth(format!("encode claims: {e}")))?;
         let signing_input = format!("{}.{}", B64.encode(header_json), B64.encode(claims_json));
         let signature = self.sign(signing_input.as_bytes()).await?;
         Ok(format!("{signing_input}.{signature}"))
@@ -252,7 +252,7 @@ impl TokenManager {
         reason = "mirrors the async `aws` variant so the call site is feature-agnostic"
     )]
     async fn sign_kms(&self, key: &KmsKey, _signing_input: &[u8]) -> Result<String> {
-        Err(UtilaError::Auth(format!(
+        Err(ApiError::Auth(format!(
             "KMS signing for {key} requires the `aws` feature (build with `--features aws`)"
         )))
     }
@@ -297,7 +297,7 @@ pub(crate) async fn inject_bearer(
     let token = tokens.token().await?;
     let value = format!("Bearer {token}")
         .parse()
-        .map_err(|e: reqwest::header::InvalidHeaderValue| UtilaError::Auth(e.to_string()))?;
+        .map_err(|e: reqwest::header::InvalidHeaderValue| ApiError::Auth(e.to_string()))?;
     req.headers_mut()
         .insert(reqwest::header::AUTHORIZATION, value);
     Ok(())
@@ -508,6 +508,6 @@ mod tests {
         let kms = KmsKey::parse("awskms:///arn:aws:kms:us-east-1:123:key/abc").unwrap();
         let tm = TokenManager::new("sa@vault-x.utilaserviceaccount.io", SignerSource::Kms(kms));
         let err = tm.token().await.unwrap_err();
-        assert!(matches!(err, UtilaError::Auth(m) if m.contains("aws")));
+        assert!(matches!(err, ApiError::Auth(m) if m.contains("aws")));
     }
 }

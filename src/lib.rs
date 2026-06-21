@@ -61,17 +61,17 @@
 //!
 //! Retry is intentionally *not* built in — each call issues a single request. To retry,
 //! wrap a whole operation with a retry crate (we recommend [`backon`](https://docs.rs/backon))
-//! and gate it on [`UtilaError::is_retryable`], which classifies transient transport/server
+//! and gate it on [`ApiError::is_retryable`], which classifies transient transport/server
 //! errors:
 //!
 //! ```no_run
 //! # async fn demo(client: utilars::UtilaClient, id: utilars::VaultId) -> utilars::Result<()> {
 //! use backon::{ExponentialBuilder, Retryable};
-//! use utilars::UtilaError;
+//! use utilars::ApiError;
 //!
 //! let vault = (|| client.vaults().get(id.clone()))
 //!     .retry(ExponentialBuilder::default())
-//!     .when(UtilaError::is_retryable)
+//!     .when(ApiError::is_retryable)
 //!     .await?;
 //! # let _ = vault; Ok(())
 //! # }
@@ -84,50 +84,54 @@ mod auth;
 mod balances;
 mod client;
 mod error;
+mod macros;
 #[rustfmt::skip]
 mod generated;
 mod address_book;
-mod ids;
 mod kms;
 mod networks;
+mod resource;
 mod transactions;
-mod tx_details;
 mod vaults;
 mod wallets;
 pub mod webhook;
+mod webhook_event;
 
 pub use address_book::{
     AddressBook, AddressBookEntry, AddressBookPage, ListAddressBookEntriesBuilder,
-    NewAddressBookEntry, VaultAction,
+    NewAddressBookEntry, VaultAction, VaultActionStatus,
 };
-pub use amount::Amount;
+pub use amount::{Amount, AmountError};
 pub use assets::{Asset, Assets, ResolvedAsset};
 pub use auth::{SignerSource, TokenManager};
 pub use balances::{
     Balance, Balances, QueryUtxosBuilder, QueryWalletAddressBalancesBuilder,
-    QueryWalletBalancesBuilder, Utxo, UtxoPage, WalletAddressBalance, WalletAddressBalancePage,
-    WalletBalance, WalletBalancePage,
+    QueryWalletBalancesBuilder, Utxo, UtxoPage, UtxoState, WalletAddressBalance,
+    WalletAddressBalancePage, WalletBalance, WalletBalancePage,
 };
 pub use client::{UtilaClient, UtilaClientBuilder};
-pub use error::{Result, UtilaError};
-pub use ids::{
-    AddressBookEntryId, AddressId, AssetId, NetworkId, TransactionId, VaultId, WalletId,
-};
+pub use error::{ApiError, Result};
 pub use kms::{AwsKmsArn, KmsKey};
-pub use networks::{BatchContract, ListNetworksBuilder, Network, NetworkPage, Networks};
-pub use transactions::{
-    AddressBalanceChange, AmlScreening, BalanceChange, EstimateFeeBuilder, EvmFee, FeeEstimate,
-    InitiateBuilder, Initiated, ListTransactionsBuilder, Priority, ReplaceBuilder, ReplacementType,
-    Simulation, Transaction, TransactionPage, TransactionRequest, Transactions, Transfer, TronFee,
-    Vote,
+pub use networks::{
+    BatchContract, ListNetworksBuilder, Network, NetworkPage, NetworkStatus, Networks,
 };
-pub use tx_details::{
-    AssetTransfer, BatchAssetTransfer, BatchDestination, EvmAccountDelegation, EvmPersonalSign,
-    EvmTransaction, EvmTypedData, ExchangeWithdrawal, SolanaRaw, StellarMemo, StellarMemoType,
-    StellarOpBody, StellarOperation, StellarRaw, StellarTimeBounds, StellarTransaction,
-    StellarTransactionBuilder, SuiRaw, TransactionDetails, TronAction, TronContractCall,
-    TronDelegate, TronFreeze, TronResource, TronTransaction, TronTransactionBuilder,
-    TronTriggerSmartContract, TronUndelegate, TronVote, XrplRaw,
+pub use resource::{
+    AddressBookEntryId, AddressBookEntryRef, AddressId, AssetId, GasStationId, GasStationRef,
+    NetworkId, NetworkRef, ParseRef, ResourceName, SimulationId, SimulationRef, TransactionId,
+    TransactionRef, TransactionRequestId, TransactionRequestRef, UserId, UserRef, VaultId,
+    VaultRef, WalletAddressRef, WalletId, WalletRef,
+};
+pub use transactions::{
+    AddressBalanceChange, AmlScreening, AssetTransfer, BalanceChange, BatchAssetTransfer,
+    BatchDestination, EstimateFeeBuilder, EvmAccountDelegation, EvmFee, EvmPersonalSign,
+    EvmTransaction, EvmTypedData, ExchangeWithdrawal, FeeEstimate, InitiateBuilder, Initiated,
+    ListTransactionsBuilder, Priority, ReplaceBuilder, ReplacementType, Simulation, SolanaRaw,
+    Sponsor, StellarMemo, StellarMemoType, StellarOpBody, StellarOperation, StellarRaw,
+    StellarTimeBounds, StellarTransaction, StellarTransactionBuilder, SuiRaw, Transaction,
+    TransactionDetails, TransactionKind, TransactionPage, TransactionRequest, Transactions,
+    Transfer, TransferEndpoint, TronAction, TronContractCall, TronDelegate, TronFee, TronFreeze,
+    TronResource, TronTransaction, TronTransactionBuilder, TronTriggerSmartContract,
+    TronUndelegate, TronVote, Vote, XrplRaw,
 };
 pub use vaults::{ListVaultsBuilder, Vault, VaultPage, Vaults};
 pub use wallets::{
@@ -135,3 +139,6 @@ pub use wallets::{
     ListAddressesBuilder, ListWalletsBuilder, Wallet, WalletAddress, WalletAddressPage, WalletPage,
     Wallets,
 };
+// `TransactionState`/`AmlAction` are shared by the transactions surface and webhook events; they
+// are also re-exported under [`webhook`] for receiver-side code.
+pub use webhook_event::{AmlAction, TransactionState};

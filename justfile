@@ -38,7 +38,11 @@ crap-ci:
     export LLVM_COV="$(command -v llvm-cov)"
     export LLVM_PROFDATA="$(command -v llvm-profdata)"
   fi
-  cargo llvm-cov --workspace --lcov --output-path tmp/lcov.info
+  # Reuse an already-collected tmp/lcov.info when REUSE_LCOV is set (see `gate`); else
+  # run the instrumented suite ourselves.
+  if [ -z "${REUSE_LCOV:-}" ]; then
+    cargo llvm-cov --workspace --lcov --output-path tmp/lcov.info
+  fi
   cargo crap --lcov tmp/lcov.info {{ crap_excludes }} \
     --baseline .cargo-crap.json --format json --output tmp/crap-delta.json
   # Predicate: any "regressed" entry, OR any "new" entry whose CRAP
@@ -54,6 +58,24 @@ crap-ci:
     exit 1
   fi
   echo "CRAP gate PASSED: no regressions, no new over-threshold functions"
+
+# Both coverage gates off ONE instrumented run: the CRAP baseline gate (`crap-ci`) and the
+# per-function coverage histogram + 90% floor (`coverage`). Running those two recipes back to
+# back re-runs the slow llvm-cov suite twice; this collects coverage once (`--no-report`) and
+# both gates reuse it via REUSE_LCOV.
+gate:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  mkdir -p tmp
+  if command -v llvm-profdata >/dev/null 2>&1; then
+    export LLVM_COV="$(command -v llvm-cov)"
+    export LLVM_PROFDATA="$(command -v llvm-profdata)"
+  fi
+  # Collect coverage once; the `report` calls in the gates below reuse this profile data.
+  cargo llvm-cov --workspace --no-report
+  cargo llvm-cov report --lcov --output-path tmp/lcov.info
+  REUSE_LCOV=1 just crap-ci
+  REUSE_LCOV=1 just coverage
 
 # Regenerate the committed CRAP baseline (`.cargo-crap.json`).
 crap-baseline:
@@ -85,12 +107,16 @@ coverage:
     export LLVM_COV="$(command -v llvm-cov)"
     export LLVM_PROFDATA="$(command -v llvm-profdata)"
   fi
-  cargo llvm-cov --workspace --lcov --output-path tmp/lcov.info >/dev/null
+  # Reuse an already-collected tmp/lcov.info + profile when REUSE_LCOV is set (see `gate`);
+  # else run the instrumented suite ourselves. The `report` below reuses the profile either way.
+  if [ -z "${REUSE_LCOV:-}" ]; then
+    cargo llvm-cov --workspace --lcov --output-path tmp/lcov.info >/dev/null
+  fi
   cargo crap --lcov tmp/lcov.info {{ crap_excludes }} --format json --output tmp/crap-now.json >/dev/null
   echo "PER-FILE LINE COVERAGE (source, excl. generated, examples, tests)"
   echo "─────────────────────────────────────────────────────────────────────"
   cargo llvm-cov report --summary-only --ignore-filename-regex 'generated.rs|xtask|tests/' \
-  | awk '$1 ~ /\.rs$/ { cov=$10; gsub(/%/,"",cov); b=int(cov/2.5); s=""; for(i=0;i<b;i++)s=s"█"; printf "  %-18s %6.2f  %s\n",$1,cov,s }'
+  | awk '$1 ~ /\.rs$/ { cov=$10; gsub(/%/,"",cov); b=int(cov/2.5); s=""; for(i=0;i<b;i++)s=s"█"; printf "  %-25s %6.2f  %s\n",$1,cov,s }'
   echo ""
   echo "PER-FUNCTION COVERAGE DISTRIBUTION (threshold = 90%)"
   echo "─────────────────────────────────────────────────────────────────"

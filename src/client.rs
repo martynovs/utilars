@@ -6,8 +6,8 @@ use serde::Deserialize;
 use crate::asset_cache::AssetCache;
 use crate::auth::{SignerSource, TokenManager};
 use crate::balances::Balances;
-use crate::error::{Result, UtilaError};
-use crate::generated::{Client as ApiClient, Error as ApiError, ResponseValue};
+use crate::error::{ApiError, Result};
+use crate::generated::{Client as ApiClient, Error as GenError, ResponseValue};
 use crate::transactions::Transactions;
 use crate::vaults::Vaults;
 
@@ -17,7 +17,7 @@ const DEFAULT_BASE_URL: &str = "https://api.utila.io";
 /// transport. The generated `Client` carries the [`TokenManager`] and authenticates
 /// every request via the async pre-hook; the facade adds typed inputs/outputs,
 /// pagination, and asset enrichment. Retry is not built in — it is applied externally by
-/// the caller (gate a retry crate on [`UtilaError::is_retryable`]).
+/// the caller (gate a retry crate on [`ApiError::is_retryable`]).
 pub struct UtilaClient {
     api: ApiClient,
     assets: AssetCache,
@@ -52,15 +52,15 @@ impl UtilaClient {
     }
 
     /// Run a generated operation and map its result to the success body or a typed
-    /// [`UtilaError`]. `op` receives the authenticated transport and returns the
+    /// [`ApiError`]. `op` receives the authenticated transport and returns the
     /// (un-awaited) `send()` future; `call` awaits it — boxed, since the generated future
     /// is large (~17 KB) — so call sites read `client.call(|api| api.foo().send()).await`:
     /// one await, no reach for the transport. Each call is exactly one request; retry wraps
-    /// the whole call externally (gate on [`UtilaError::is_retryable`]).
+    /// the whole call externally (gate on [`ApiError::is_retryable`]).
     pub(crate) async fn call<'s, T, F, Fut>(&'s self, op: F) -> Result<T>
     where
         F: FnOnce(&'s ApiClient) -> Fut,
-        Fut: std::future::Future<Output = std::result::Result<ResponseValue<T>, ApiError>> + 's,
+        Fut: std::future::Future<Output = std::result::Result<ResponseValue<T>, GenError>> + 's,
     {
         match Box::pin(op(&self.api)).await {
             Ok(resp) => Ok(resp.into_inner()),
@@ -84,23 +84,23 @@ pub(crate) fn enum_label<T: serde::Serialize>(value: &T) -> Option<String> {
     }
 }
 
-/// Map a generated transport error into a typed [`UtilaError`]. Non-success responses
+/// Map a generated transport error into a typed [`ApiError`]. Non-success responses
 /// (the spec declares only 200, so all of them surface as `UnexpectedResponse`) get the
 /// gRPC status envelope parsed out of the body; auth pre-hook failures arrive as `Custom`.
-async fn map_error(e: ApiError) -> UtilaError {
+async fn map_error(e: GenError) -> ApiError {
     match e {
-        ApiError::UnexpectedResponse(resp) => parse_api_error(resp).await,
-        ApiError::Custom(msg) => UtilaError::Auth(msg),
-        ApiError::InvalidRequest(msg) => UtilaError::Config(msg),
-        ApiError::CommunicationError(e)
-        | ApiError::InvalidUpgrade(e)
-        | ApiError::ResponseBodyError(e) => UtilaError::Http(e),
-        ApiError::InvalidResponsePayload(_, e) => UtilaError::Api {
+        GenError::UnexpectedResponse(resp) => parse_api_error(resp).await,
+        GenError::Custom(msg) => ApiError::Auth(msg),
+        GenError::InvalidRequest(msg) => ApiError::Config(msg),
+        GenError::CommunicationError(e)
+        | GenError::InvalidUpgrade(e)
+        | GenError::ResponseBodyError(e) => ApiError::Http(e),
+        GenError::InvalidResponsePayload(_, e) => ApiError::Api {
             code: -1,
             message: format!("invalid response payload: {e}"),
             details: Vec::new(),
         },
-        ApiError::ErrorResponse(rv) => UtilaError::Api {
+        GenError::ErrorResponse(rv) => ApiError::Api {
             code: i32::from(rv.status().as_u16()),
             message: "unexpected error response".into(),
             details: Vec::new(),
@@ -108,7 +108,7 @@ async fn map_error(e: ApiError) -> UtilaError {
     }
 }
 
-async fn parse_api_error(resp: reqwest::Response) -> UtilaError {
+async fn parse_api_error(resp: reqwest::Response) -> ApiError {
     #[derive(Deserialize, Default)]
     struct GrpcStatus {
         #[serde(default)]
@@ -123,13 +123,13 @@ async fn parse_api_error(resp: reqwest::Response) -> UtilaError {
     let status = resp.status();
     let body = resp.text().await.unwrap_or_default();
     match serde_json::from_str::<GrpcStatus>(&body) {
-        Ok(s) => UtilaError::Api {
+        Ok(s) => ApiError::Api {
             code: s.code,
             message: s.message,
             details: s.details,
         },
         // Body wasn't a gRPC status envelope: fall back to the HTTP status + raw body.
-        Err(_) => UtilaError::Api {
+        Err(_) => ApiError::Api {
             code: i32::from(status.as_u16()),
             message: body,
             details: Vec::new(),
@@ -173,7 +173,7 @@ impl UtilaClientBuilder {
     pub fn build(self) -> Result<UtilaClient> {
         let (account, signer) = self
             .credential
-            .ok_or_else(|| UtilaError::Config("credential is required".into()))?;
+            .ok_or_else(|| ApiError::Config("credential is required".into()))?;
         let tokens = Arc::new(TokenManager::new(account, signer));
         let base_url = self
             .base_url
@@ -207,16 +207,16 @@ mod tests {
 
         assert!(matches!(
             map_error(E::Custom("boom".into())).await,
-            UtilaError::Auth(m) if m == "boom"
+            ApiError::Auth(m) if m == "boom"
         ));
         assert!(matches!(
             map_error(E::InvalidRequest("bad".into())).await,
-            UtilaError::Config(m) if m == "bad"
+            ApiError::Config(m) if m == "bad"
         ));
         let serde_err = serde_json::from_str::<i32>("\"nope\"").unwrap_err();
         assert!(matches!(
             map_error(E::InvalidResponsePayload(bytes::Bytes::new(), serde_err)).await,
-            UtilaError::Api { code: -1, .. }
+            ApiError::Api { code: -1, .. }
         ));
         // A real (connection-refused) reqwest::Error exercises the transport arm; port 1
         // on loopback refuses immediately, so this stays deterministic and offline.
@@ -227,7 +227,7 @@ mod tests {
             .unwrap_err();
         assert!(matches!(
             map_error(E::CommunicationError(http_err)).await,
-            UtilaError::Http(_)
+            ApiError::Http(_)
         ));
         // The other two reqwest-wrapping variants share the same arm.
         let e2 = reqwest::Client::new()
@@ -237,7 +237,7 @@ mod tests {
             .unwrap_err();
         assert!(matches!(
             map_error(E::InvalidUpgrade(e2)).await,
-            UtilaError::Http(_)
+            ApiError::Http(_)
         ));
         let e3 = reqwest::Client::new()
             .get("http://127.0.0.1:1")
@@ -246,7 +246,7 @@ mod tests {
             .unwrap_err();
         assert!(matches!(
             map_error(E::ResponseBodyError(e3)).await,
-            UtilaError::Http(_)
+            ApiError::Http(_)
         ));
         // `ErrorResponse` only arises for documented non-200s (the spec has none), but the
         // arm must still map; `ResponseValue::new` lets us exercise it directly.
@@ -257,7 +257,7 @@ mod tests {
         );
         assert!(matches!(
             map_error(E::ErrorResponse(rv)).await,
-            UtilaError::Api { code: 502, .. }
+            ApiError::Api { code: 502, .. }
         ));
     }
 
