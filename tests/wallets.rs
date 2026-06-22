@@ -3,7 +3,7 @@ mod common;
 use common::client;
 use futures::TryStreamExt;
 use serde_json::json;
-use utilars::{NetworkId, VaultId};
+use utilars::{AddressId, NetworkId, VaultId, WalletId};
 use wiremock::matchers::{method, path, query_param, query_param_is_missing};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -45,10 +45,7 @@ async fn wallets_list_authenticates_parses_and_paginates() {
     assert_eq!(page.wallets[0].name.to_string(), "vaults/v1/wallets/w1");
     assert_eq!(page.wallets[0].display_name.as_deref(), Some("Hot"));
     assert_eq!(page.wallets[0].networks.len(), 2);
-    assert_eq!(
-        page.wallets[0].networks[0].as_str(),
-        "networks/ethereum-mainnet"
-    );
+    assert_eq!(page.wallets[0].networks[0].as_str(), "ethereum-mainnet");
     assert!(page.wallets[0].external);
     assert_eq!(page.next_page_token.as_deref(), Some("page2"));
     assert_eq!(page.total_size, 1);
@@ -151,7 +148,7 @@ async fn wallets_create_sends_body_and_parses() {
     let wallet = client
         .wallets()
         .create(VaultId::new("v1"), "Fresh")
-        .network(NetworkId::new("networks/ethereum-mainnet"))
+        .network(NetworkId::new("ethereum-mainnet"))
         .external(false)
         .send()
         .await
@@ -216,14 +213,14 @@ async fn wallets_batch_archive_and_unarchive_send_names() {
     let client = client(&server.uri());
     client
         .wallets()
-        .batch_archive(VaultId::new("v1"), vec!["vaults/v1/wallets/w1".to_string()])
+        .batch_archive(VaultId::new("v1"), &[WalletId::new("w1")])
         .allow_missing(true)
         .send()
         .await
         .unwrap();
     client
         .wallets()
-        .batch_unarchive(VaultId::new("v1"), vec!["vaults/v1/wallets/w2".to_string()])
+        .batch_unarchive(VaultId::new("v1"), &[WalletId::new("w2")])
         .send()
         .await
         .unwrap();
@@ -255,10 +252,7 @@ async fn wallets_batch_get_parses() {
         .wallets()
         .batch_get(
             VaultId::new("v1"),
-            vec![
-                "vaults/v1/wallets/w1".to_string(),
-                "vaults/v1/wallets/w2".to_string(),
-            ],
+            &[WalletId::new("w1"), WalletId::new("w2")],
         )
         .await
         .unwrap();
@@ -306,10 +300,7 @@ async fn wallet_addresses_list_and_stream() {
         .await
         .unwrap();
     assert_eq!(page.addresses[0].address.as_deref(), Some("bc1qexample"));
-    assert_eq!(
-        page.addresses[0].network.as_str(),
-        "networks/bitcoin-mainnet"
-    );
+    assert_eq!(page.addresses[0].network.as_str(), "bitcoin-mainnet");
     assert_eq!(page.addresses[0].format.as_deref(), Some("BITCOIN_P2WPKH"));
     assert_eq!(page.addresses[0].kind.as_deref(), Some("DEPOSIT"));
 
@@ -381,7 +372,7 @@ async fn wallet_address_create_sends_body() {
         .create_address(
             VaultId::new("v1"),
             utilars::WalletId::new("w1"),
-            NetworkId::new("networks/ethereum-mainnet"),
+            NetworkId::new("ethereum-mainnet"),
         )
         .display_name("Deposit 1")
         .note("primary")
@@ -416,11 +407,8 @@ async fn wallet_addresses_batch_get_parses() {
         .wallets()
         .batch_get_addresses(
             VaultId::new("v1"),
-            utilars::WalletId::new("w1"),
-            vec![
-                "vaults/v1/wallets/w1/addresses/a1".to_string(),
-                "vaults/v1/wallets/w1/addresses/a2".to_string(),
-            ],
+            WalletId::new("w1"),
+            &[AddressId::new("a1"), AddressId::new("a2")],
         )
         .await
         .unwrap();

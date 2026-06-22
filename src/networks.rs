@@ -11,7 +11,7 @@ use crate::generated::types::{
     V2NetworkStatusEnum,
 };
 use crate::generated::ClientBlockchainsExt;
-use crate::resource::{AssetId, NetworkId, NetworkRef, ResourceName, VaultId};
+use crate::resource::{AssetId, AssetRef, NetworkId, NetworkRef, ParseRef, ResourceName, VaultId};
 
 /// A blockchain network Utila supports. `name` is the resource name, e.g.
 /// `networks/ethereum-mainnet`.
@@ -30,7 +30,10 @@ impl From<V2Network> for Network {
         Self {
             name: ResourceName::parse(n.name.unwrap_or_default()),
             display_name: n.display_name.filter(|s| !s.is_empty()),
-            native_asset: n.native_asset.filter(|s| !s.is_empty()).map(AssetId::from),
+            native_asset: n
+                .native_asset
+                .filter(|s| !s.is_empty())
+                .and_then(|s| AssetRef::parse(&s).map(AssetId::from)),
             status: n.status.map(NetworkStatus::from),
             testnet: n.testnet.unwrap_or(false),
             custom: n.custom.unwrap_or(false),

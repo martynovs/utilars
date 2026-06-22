@@ -26,7 +26,8 @@ use crate::generated::types::{
 };
 use crate::generated::ClientBalancesExt;
 use crate::resource::{
-    AddressId, AssetId, NetworkId, ResourceName, VaultId, WalletAddressRef, WalletId, WalletRef,
+    AddressId, AssetId, AssetRef, NetworkId, ParseRef, ResourceName, VaultId, WalletAddressRef,
+    WalletId, WalletRef,
 };
 
 /// A vault balance for one asset. The exact base-unit `amount` is always present; a
@@ -248,7 +249,7 @@ impl<'a> Balances<'a> {
     ) -> Result<Balance> {
         let body = BalancesRefreshAssetAddressBalanceBody {
             address: address.into(),
-            asset: asset.as_str().to_string(),
+            asset: AssetRef::resource_name(&asset),
             include_referenced_resources: None,
         };
         let resp: V2RefreshAssetAddressBalanceResponse = self
@@ -699,7 +700,9 @@ fn balance_from(b: V2Balance, metas: &HashMap<String, ResolvedAsset>) -> Result<
 fn resolve_asset(metas: &HashMap<String, ResolvedAsset>, asset_id: &str) -> Asset {
     match metas.get(asset_id) {
         Some(resolved) => Asset::Resolved(resolved.clone()),
-        None => Asset::Unresolved(AssetId::from(asset_id)),
+        None => Asset::Unresolved(
+            AssetRef::parse(asset_id).map_or_else(|| AssetId::new(asset_id), AssetId::from),
+        ),
     }
 }
 

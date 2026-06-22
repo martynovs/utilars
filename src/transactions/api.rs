@@ -22,8 +22,8 @@ use crate::generated::types::{
 };
 use crate::generated::ClientTransactionsExt;
 use crate::resource::{
-    AssetId, NetworkId, ParseRef, ResourceName, SimulationRef, TransactionId, TransactionRef,
-    TransactionRequestRef, UserRef, VaultId, WalletRef,
+    AssetId, AssetRef, NetworkId, ParseRef, ResourceName, SimulationRef, TransactionId,
+    TransactionRef, TransactionRequestRef, UserRef, VaultId, WalletRef,
 };
 use crate::webhook_event::TransactionState;
 
@@ -187,7 +187,10 @@ pub struct Transfer {
 impl From<TransactionTransfer> for Transfer {
     fn from(t: TransactionTransfer) -> Self {
         Self {
-            asset: t.asset.filter(|s| !s.is_empty()).map(AssetId::from),
+            asset: t
+                .asset
+                .filter(|s| !s.is_empty())
+                .and_then(|s| AssetRef::parse(&s).map(AssetId::from)),
             amount: t.amount.and_then(|s| s.parse::<Decimal>().ok()),
             source_address: t
                 .source_address
@@ -315,7 +318,10 @@ pub struct BalanceChange {
 impl From<V2BalanceChange> for BalanceChange {
     fn from(b: V2BalanceChange) -> Self {
         Self {
-            asset: b.asset.filter(|s| !s.is_empty()).map(AssetId::from),
+            asset: b
+                .asset
+                .filter(|s| !s.is_empty())
+                .and_then(|s| AssetRef::parse(&s).map(AssetId::from)),
             amount: b.amount.filter(|s| !s.is_empty()),
             negative: b.negative.unwrap_or(false),
         }
@@ -540,9 +546,16 @@ impl<'a> Transactions<'a> {
             .ok_or_else(|| missing("transaction"))
     }
 
-    /// Get several transactions by full resource name
-    /// (`vaults/{vault_id}/transactions/{transaction_id}`).
-    pub async fn batch_get(&self, vault: VaultId, names: Vec<String>) -> Result<Vec<Transaction>> {
+    /// Get several transactions in a vault by id.
+    pub async fn batch_get(
+        &self,
+        vault: VaultId,
+        transactions: &[TransactionId],
+    ) -> Result<Vec<Transaction>> {
+        let names: Vec<String> = transactions
+            .iter()
+            .map(|t| TransactionRef::resource_name(&vault, t))
+            .collect();
         let resp = self
             .client
             .call(|api| {

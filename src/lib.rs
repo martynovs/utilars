@@ -116,10 +116,11 @@ pub use networks::{
     BatchContract, ListNetworksBuilder, Network, NetworkPage, NetworkStatus, Networks,
 };
 pub use resource::{
-    AddressBookEntryId, AddressBookEntryRef, AddressId, AssetId, GasStationId, GasStationRef,
-    NetworkId, NetworkRef, ParseRef, ResourceName, SimulationId, SimulationRef, TransactionId,
-    TransactionRef, TransactionRequestId, TransactionRequestRef, UserId, UserRef, VaultId,
-    VaultRef, WalletAddressRef, WalletId, WalletRef,
+    AddressBookEntryGroupId, AddressBookEntryGroupRef, AddressBookEntryId, AddressBookEntryRef,
+    AddressId, AssetId, AssetRef, GasStationId, GasStationRef, NetworkId, NetworkRef, ParseRef,
+    ResourceName, SimulationId, SimulationRef, TransactionId, TransactionRef, TransactionRequestId,
+    TransactionRequestRef, UserId, UserRef, VaultId, VaultRef, WalletAddressRef, WalletId,
+    WalletRef,
 };
 pub use transactions::{
     AddressBalanceChange, AmlScreening, AssetTransfer, BalanceChange, BatchAssetTransfer,

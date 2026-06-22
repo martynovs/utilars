@@ -9,8 +9,7 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 #[tokio::test]
 async fn assets_get_resolves_single() {
     let server = MockServer::start().await;
-    // AssetId carries the full `assets/...` name; the Get path param is only the segment,
-    // so the request path must be the prefix-stripped id.
+    // AssetId is the bare segment; the Get path param uses it directly.
     Mock::given(method("GET"))
         .and(path("/v2/assets/native.ethereum-mainnet"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
@@ -28,11 +27,11 @@ async fn assets_get_resolves_single() {
     let client = client(&server.uri());
     let asset = client
         .assets()
-        .get(utilars::AssetId::new("assets/native.ethereum-mainnet"))
+        .get(utilars::AssetId::new("native.ethereum-mainnet"))
         .await
         .unwrap();
 
-    assert_eq!(asset.id.as_str(), "assets/native.ethereum-mainnet");
+    assert_eq!(asset.id.as_str(), "native.ethereum-mainnet");
     assert_eq!(asset.decimals, 18);
     assert_eq!(asset.symbol, "ETH");
 
@@ -88,12 +87,12 @@ async fn assets_get_for_vault_resolves() {
         .assets()
         .get_for_vault(
             utilars::VaultId::new("abc"),
-            utilars::AssetId::new("assets/imported.usdc"),
+            utilars::AssetId::new("imported.usdc"),
         )
         .await
         .unwrap();
 
-    assert_eq!(asset.id.as_str(), "assets/imported.usdc");
+    assert_eq!(asset.id.as_str(), "imported.usdc");
     assert_eq!(asset.decimals, 6);
     assert_eq!(asset.symbol, "USDC");
 }
@@ -101,6 +100,8 @@ async fn assets_get_for_vault_resolves() {
 #[tokio::test]
 async fn assets_batch_get_returns_all() {
     let server = MockServer::start().await;
+    // Bare ids in → the wire carries the full `assets/{id}` resource name (the `assets/` prefix is
+    // added by `AssetRef`, never required from the caller).
     Mock::given(method("GET"))
         .and(path("/v2/assets:batchGet"))
         .and(query_param("names", "assets/native.ethereum-mainnet"))
@@ -117,16 +118,16 @@ async fn assets_batch_get_returns_all() {
     let assets = client
         .assets()
         .batch_get([
-            utilars::AssetId::new("assets/native.ethereum-mainnet"),
-            utilars::AssetId::new("assets/imported.usdc"),
+            utilars::AssetId::new("native.ethereum-mainnet"),
+            utilars::AssetId::new("imported.usdc"),
         ])
         .await
         .unwrap();
 
     assert_eq!(assets.len(), 2);
-    assert_eq!(assets[0].id.as_str(), "assets/native.ethereum-mainnet");
+    assert_eq!(assets[0].id.as_str(), "native.ethereum-mainnet");
     assert_eq!(assets[0].symbol, "ETH");
-    assert_eq!(assets[1].id.as_str(), "assets/imported.usdc");
+    assert_eq!(assets[1].id.as_str(), "imported.usdc");
     assert_eq!(assets[1].decimals, 6);
 }
 
@@ -141,10 +142,7 @@ async fn assets_get_for_vault_missing_is_typed_error() {
     let client = client(&server.uri());
     let err = client
         .assets()
-        .get_for_vault(
-            utilars::VaultId::new("v1"),
-            utilars::AssetId::new("assets/x"),
-        )
+        .get_for_vault(utilars::VaultId::new("v1"), utilars::AssetId::new("x"))
         .await
         .unwrap_err();
     assert!(matches!(err, utilars::ApiError::Api { code: -1, .. }));

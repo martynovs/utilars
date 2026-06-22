@@ -6,7 +6,7 @@ use rust_decimal::Decimal;
 use super::details::{Sponsor, TransferEndpoint};
 use super::stellar::StellarMemo;
 use crate::generated::types as g;
-use crate::resource::AssetId;
+use crate::resource::{AssetId, AssetRef};
 
 /// Transfer an asset from a source wallet to a destination address. `assetTransfer` is the
 /// API's one **cross-chain** transfer primitive; the optional fields below are the per-chain
@@ -40,7 +40,7 @@ impl From<AssetTransfer> for g::V2AssetTransfer {
     fn from(t: AssetTransfer) -> Self {
         g::V2AssetTransfer {
             amount: t.amount.to_string(),
-            asset: t.asset.as_str().to_string(),
+            asset: AssetRef::resource_name(&t.asset),
             destination: t.destination.to_wire(),
             source: t.source.to_wire(),
             memo: t.memo,
@@ -88,7 +88,7 @@ impl From<BatchDestination> for g::BatchAssetTransferBatchTransferDestination {
 impl From<BatchAssetTransfer> for g::V2BatchAssetTransfer {
     fn from(t: BatchAssetTransfer) -> Self {
         g::V2BatchAssetTransfer {
-            asset: t.asset.as_str().to_string(),
+            asset: AssetRef::resource_name(&t.asset),
             source: t.source.to_wire(),
             destinations: t.destinations.into_iter().map(Into::into).collect(),
         }
@@ -111,7 +111,7 @@ impl From<ExchangeWithdrawal> for g::Apiv2ExchangeWithdrawal {
     fn from(t: ExchangeWithdrawal) -> Self {
         g::Apiv2ExchangeWithdrawal {
             amount: t.amount.to_string(),
-            asset: t.asset.as_str().to_string(),
+            asset: AssetRef::resource_name(&t.asset),
             destination: t.destination,
             destination_network: t.destination_network,
             pay_fee_from_amount: t.pay_fee_from_amount,

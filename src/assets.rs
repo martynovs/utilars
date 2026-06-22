@@ -6,7 +6,7 @@ use crate::client::UtilaClient;
 use crate::error::{ApiError, Result};
 use crate::generated::types::V2Asset;
 use crate::generated::ClientAssetsExt;
-use crate::resource::{AssetId, VaultId};
+use crate::resource::{AssetId, AssetRef, ParseRef, VaultId};
 
 /// An asset reference — either resolved with metadata, or just its id if it couldn't be
 /// looked up. Match on it to get decimals/symbol with no `Option`.
@@ -33,7 +33,11 @@ pub struct ResolvedAsset {
 impl From<V2Asset> for ResolvedAsset {
     fn from(a: V2Asset) -> Self {
         Self {
-            id: AssetId::from(a.name.unwrap_or_default()),
+            id: a
+                .name
+                .filter(|s| !s.is_empty())
+                .and_then(|n| AssetRef::parse(&n).map(AssetId::from))
+                .unwrap_or(AssetId::EMPTY),
             decimals: a.decimals.and_then(|d| u32::try_from(d).ok()).unwrap_or(0),
             symbol: a.symbol.unwrap_or_default(),
         }
@@ -73,7 +77,7 @@ pub struct Assets<'a> {
 impl Assets<'_> {
     /// Get one asset by resource name (e.g. `assets/native.ethereum-mainnet`).
     pub async fn get(&self, id: AssetId) -> Result<ResolvedAsset> {
-        let segment = asset_segment(&id).to_string();
+        let segment = id.as_str().to_string();
         let resp = self
             .client
             .call(|api| api.assets_get_asset().asset_id(segment).send())
@@ -85,7 +89,7 @@ impl Assets<'_> {
 
     /// Get a vault-scoped asset (an imported token or custom-chain token) by resource name.
     pub async fn get_for_vault(&self, vault: VaultId, asset: AssetId) -> Result<ResolvedAsset> {
-        let segment = asset_segment(&asset).to_string();
+        let segment = asset.as_str().to_string();
         let resp = self
             .client
             .call(|api| {
@@ -108,7 +112,7 @@ impl Assets<'_> {
     ) -> Result<Vec<ResolvedAsset>> {
         let names: Vec<String> = names
             .into_iter()
-            .map(|id| id.as_str().to_string())
+            .map(|id| AssetRef::resource_name(&id))
             .collect();
         let resp = self
             .client
@@ -116,13 +120,6 @@ impl Assets<'_> {
             .await?;
         Ok(resp.assets.into_iter().map(ResolvedAsset::from).collect())
     }
-}
-
-/// The path-segment form of an asset id. `AssetId` carries the full resource name
-/// (`assets/{asset_id}`), but the single-resource `Get` path params take only the
-/// `{asset_id}` segment, so strip the `assets/` prefix when present.
-fn asset_segment(id: &AssetId) -> &str {
-    id.as_str().strip_prefix("assets/").unwrap_or(id.as_str())
 }
 
 #[cfg(test)]
@@ -155,7 +152,7 @@ mod tests {
             ..Default::default()
         };
         let r = ResolvedAsset::from(a);
-        assert_eq!(r.id.as_str(), "assets/native.ethereum-mainnet");
+        assert_eq!(r.id.as_str(), "native.ethereum-mainnet");
         assert_eq!(r.decimals, 18);
         assert_eq!(r.symbol, "ETH");
 
@@ -167,18 +164,5 @@ mod tests {
         assert_eq!(bare.id.as_str(), "");
         assert_eq!(bare.decimals, 0);
         assert_eq!(bare.symbol, "");
-    }
-
-    #[test]
-    fn asset_segment_strips_prefix() {
-        assert_eq!(
-            asset_segment(&AssetId::from("assets/native.ethereum-mainnet")),
-            "native.ethereum-mainnet"
-        );
-        // No prefix → returned unchanged.
-        assert_eq!(
-            asset_segment(&AssetId::from("native.ethereum-mainnet")),
-            "native.ethereum-mainnet"
-        );
     }
 }

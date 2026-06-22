@@ -45,7 +45,7 @@ async fn balances_resolve_or_leave_unresolved() {
     }
     // unresolved asset → Unresolved, exact base-unit amount still present
     match &bals[1].asset {
-        Asset::Unresolved(id) => assert_eq!(id.as_str(), "assets/unknown.token"),
+        Asset::Unresolved(id) => assert_eq!(id.as_str(), "unknown.token"),
         Asset::Resolved(a) => panic!("expected unresolved, got resolved {}", a.id),
     }
     assert_eq!(bals[1].amount.value(), 5);
@@ -106,7 +106,7 @@ async fn wallet_balances_send_enriches_and_sends_filters() {
     }
     assert_eq!(page.balances[1].amount.value(), 7);
     match &page.balances[1].asset {
-        Asset::Unresolved(id) => assert_eq!(id.as_str(), "assets/unknown.token"),
+        Asset::Unresolved(id) => assert_eq!(id.as_str(), "unknown.token"),
         Asset::Resolved(a) => panic!("expected unresolved, got {}", a.id),
     }
 }
@@ -381,11 +381,7 @@ async fn refresh_asset_address_balance_enriches() {
     let client = client(&server.uri());
     let bal = client
         .balances()
-        .refresh_asset_address_balance(
-            VaultId::new("abc"),
-            utilars::AssetId::new("assets/x"),
-            "0xabc",
-        )
+        .refresh_asset_address_balance(VaultId::new("abc"), utilars::AssetId::new("x"), "0xabc")
         .await
         .unwrap();
 

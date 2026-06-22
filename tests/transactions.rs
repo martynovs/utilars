@@ -25,7 +25,7 @@ async fn initiate_sends_exactly_one_detail_and_idempotency_key() {
         .asset_transfer(
             VaultId::new("abc"),
             AssetTransfer {
-                asset: "assets/native.ethereum-mainnet".into(),
+                asset: "native.ethereum-mainnet".into(),
                 source: "vaults/abc/wallets/w1".into(),
                 destination: "0xabc".into(),
                 amount: dec!(1.5),
@@ -78,7 +78,7 @@ async fn initiate_request_id_override_is_used() {
         .asset_transfer(
             VaultId::new("abc"),
             AssetTransfer {
-                asset: "assets/x".into(),
+                asset: "x".into(),
                 source: "s".into(),
                 destination: "d".into(),
                 amount: dec!(1),
@@ -260,9 +260,9 @@ async fn transactions_batch_get_returns_all() {
         .transactions()
         .batch_get(
             VaultId::new("abc"),
-            vec![
-                "vaults/abc/transactions/tx1".to_string(),
-                "vaults/abc/transactions/tx2".to_string(),
+            &[
+                utilars::TransactionId::new("tx1"),
+                utilars::TransactionId::new("tx2"),
             ],
         )
         .await
@@ -436,7 +436,7 @@ async fn transactions_estimate_fee_with_priority() {
         .estimate_fee(
             VaultId::new("abc"),
             TransactionDetails::AssetTransfer(AssetTransfer {
-                asset: utilars::AssetId::new("assets/native.ethereum-mainnet"),
+                asset: utilars::AssetId::new("native.ethereum-mainnet"),
                 source: "vaults/abc/wallets/w1".into(),
                 destination: "0xbbb".into(),
                 amount: dec!(1.5),

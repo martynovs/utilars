@@ -19,7 +19,8 @@ use crate::generated::types::{
 };
 use crate::generated::ClientWalletsExt;
 use crate::resource::{
-    AddressId, NetworkId, ResourceName, VaultId, WalletAddressRef, WalletId, WalletRef,
+    AddressId, NetworkId, NetworkRef, ParseRef, ResourceName, VaultId, WalletAddressRef, WalletId,
+    WalletRef,
 };
 
 /// A wallet in a vault. `name` is the resource name, e.g.
@@ -47,7 +48,7 @@ impl From<V2Wallet> for Wallet {
                 .networks
                 .into_iter()
                 .filter(|s| !s.is_empty())
-                .map(NetworkId::from)
+                .filter_map(|s| NetworkRef::parse(&s).map(NetworkId::from))
                 .collect(),
             archived: w.archived.unwrap_or(false),
             external: w.external.unwrap_or(false),
@@ -81,7 +82,7 @@ impl From<V2WalletAddress> for WalletAddress {
             name: ResourceName::parse(a.name.unwrap_or_default()),
             address: a.address.filter(|s| !s.is_empty()),
             display_name: a.display_name.filter(|s| !s.is_empty()),
-            network: NetworkId::from(a.network),
+            network: NetworkRef::parse(&a.network).map_or(NetworkId::EMPTY, NetworkId::from),
             format: a.format.as_ref().and_then(enum_label),
             kind: a.type_.as_ref().and_then(enum_label),
             key: a.key.filter(|s| !s.is_empty()),
@@ -201,12 +202,13 @@ impl<'a> Wallets<'a> {
         }
     }
 
-    /// Archive up to 1000 wallets by resource name (`vaults/{v}/wallets/{w}`).
+    /// Archive up to 1000 wallets in a vault by id.
     pub fn batch_archive(
         &self,
         vault: VaultId,
-        names: Vec<String>,
+        wallets: &[WalletId],
     ) -> BatchArchiveWalletsBuilder<'a> {
+        let names = wallet_names(&vault, wallets);
         BatchArchiveWalletsBuilder {
             client: self.client,
             vault,
@@ -216,12 +218,13 @@ impl<'a> Wallets<'a> {
         }
     }
 
-    /// Unarchive up to 1000 wallets by resource name.
+    /// Unarchive up to 1000 wallets by id.
     pub fn batch_unarchive(
         &self,
         vault: VaultId,
-        names: Vec<String>,
+        wallets: &[WalletId],
     ) -> BatchArchiveWalletsBuilder<'a> {
+        let names = wallet_names(&vault, wallets);
         BatchArchiveWalletsBuilder {
             client: self.client,
             vault,
@@ -231,8 +234,9 @@ impl<'a> Wallets<'a> {
         }
     }
 
-    /// Retrieve multiple wallets by resource name (`vaults/{v}/wallets/{w}`).
-    pub async fn batch_get(&self, vault: VaultId, names: Vec<String>) -> Result<Vec<Wallet>> {
+    /// Retrieve multiple wallets in a vault by id.
+    pub async fn batch_get(&self, vault: VaultId, wallets: &[WalletId]) -> Result<Vec<Wallet>> {
+        let names = wallet_names(&vault, wallets);
         let resp: V2BatchGetWalletsResponse = self
             .client
             .call(|api| {
@@ -295,13 +299,17 @@ impl<'a> Wallets<'a> {
         }
     }
 
-    /// Retrieve multiple of a wallet's addresses by resource name.
+    /// Retrieve multiple of a wallet's addresses by id.
     pub async fn batch_get_addresses(
         &self,
         vault: VaultId,
         wallet: WalletId,
-        names: Vec<String>,
+        addresses: &[AddressId],
     ) -> Result<Vec<WalletAddress>> {
+        let names: Vec<String> = addresses
+            .iter()
+            .map(|a| WalletAddressRef::resource_name(&vault, &wallet, a))
+            .collect();
         let resp: V2BatchGetWalletAddressesResponse = self
             .client
             .call(|api| {
@@ -566,7 +574,7 @@ impl CreateWalletBuilder<'_> {
             networks: self
                 .networks
                 .iter()
-                .map(|n| n.as_str().to_string())
+                .map(NetworkRef::resource_name)
                 .collect(),
             solana_details: None,
             ton_details: None,
@@ -617,7 +625,7 @@ impl CreateAddressBuilder<'_> {
             key: None,
             key_derivation_path: Vec::new(),
             name: None,
-            network: self.network.as_str().to_string(),
+            network: NetworkRef::resource_name(&self.network),
             note: self.note,
             type_: None,
         };
@@ -684,6 +692,14 @@ impl ArchiveWalletBuilder<'_> {
         }
         Ok(())
     }
+}
+
+/// The full `vaults/{vault}/wallets/{wallet}` resource names for a batch request.
+fn wallet_names(vault: &VaultId, wallets: &[WalletId]) -> Vec<String> {
+    wallets
+        .iter()
+        .map(|w| WalletRef::resource_name(vault, w))
+        .collect()
 }
 
 // ---- batch archive / unarchive ----

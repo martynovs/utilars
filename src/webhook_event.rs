@@ -8,8 +8,8 @@
 
 use serde::Deserialize;
 
-use crate::resource::{AddressId, TransactionId, VaultId, WalletId};
-use crate::resource::{TransactionRef, WalletAddressRef, WalletRef};
+use crate::resource::{AddressId, ParseRef, TransactionId, VaultId, WalletId};
+use crate::resource::{TransactionRef, VaultRef, WalletAddressRef, WalletRef};
 
 /// A Utila webhook event. Every variant carries the envelope `id`; resource-bearing kinds carry
 /// a typed resource reference ([`TransactionRef`]/[`WalletRef`]/[`WalletAddressRef`], each holding
@@ -85,7 +85,8 @@ impl<'de> Deserialize<'de> for Event {
         }
         let raw = Raw::deserialize(deserializer)?;
         let id = raw.id.to_owned();
-        let vault = VaultId::new(raw.vault.strip_prefix("vaults/").unwrap_or(raw.vault));
+        let vault =
+            VaultRef::parse(raw.vault).map_or_else(|| VaultId::new(raw.vault), VaultId::from);
         let rty = raw.resource_type;
         let resource = raw.resource;
         let details = raw.details.as_ref();

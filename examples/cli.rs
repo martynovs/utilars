@@ -31,9 +31,16 @@ use clap::{Parser, Subcommand};
 use futures::TryStreamExt as _;
 use rust_decimal::Decimal;
 use utilars::{
-    AssetId, AssetTransfer, EvmTransaction, InitiateBuilder, SignerSource, SolanaRaw, StellarRaw,
-    SuiRaw, TransactionId, TronTriggerSmartContract, UtilaClient, VaultId, XrplRaw,
+    AssetId, AssetRef, AssetTransfer, EvmTransaction, InitiateBuilder, ParseRef, SignerSource,
+    SolanaRaw, StellarRaw, SuiRaw, TransactionId, TronTriggerSmartContract, UtilaClient, VaultId,
+    XrplRaw,
 };
+
+/// Accept an asset id with or without the `assets/` prefix — the bare segment is canonical, but a
+/// pasted resource name (`assets/native.ethereum-mainnet`) is normalized to it.
+fn parse_asset(s: String) -> AssetId {
+    AssetRef::parse(&s).map_or_else(|| AssetId::new(s), AssetId::from)
+}
 
 #[derive(Parser)]
 #[command(
@@ -49,9 +56,10 @@ struct Cli {
 enum Command {
     /// List the blockchain networks Utila supports.
     Networks,
-    /// List metadata for one or more assets by resource name (batch-get).
+    /// List metadata for one or more assets by id (batch-get).
     Assets {
-        /// One or more asset resource names (e.g. `assets/native.ethereum-mainnet`).
+        /// One or more asset ids; the `assets/` prefix is optional
+        /// (`native.ethereum-mainnet` or `assets/native.ethereum-mainnet`).
         #[arg(required = true)]
         ids: Vec<String>,
     },
@@ -79,7 +87,7 @@ enum Command {
     Transfer {
         /// Vault id (the segment after `vaults/`).
         vault: String,
-        /// Asset resource name, e.g. `assets/native.ethereum-mainnet`.
+        /// Asset id; the `assets/` prefix is optional, e.g. `native.ethereum-mainnet`.
         #[arg(long)]
         asset: String,
         /// Source: a wallet resource name (`vaults/<v>/wallets/<w>`) or an address.
@@ -300,7 +308,7 @@ async fn run(client: &UtilaClient, command: Command) -> Result<()> {
         Command::Assets { ids } => {
             let assets = client
                 .assets()
-                .batch_get(ids.into_iter().map(AssetId::new))
+                .batch_get(ids.into_iter().map(parse_asset))
                 .await?;
             for a in &assets {
                 println!("{a:#?}");
@@ -377,7 +385,7 @@ async fn run(client: &UtilaClient, command: Command) -> Result<()> {
             let mut builder = client.transactions().asset_transfer(
                 VaultId::new(vault),
                 AssetTransfer {
-                    asset: AssetId::new(asset),
+                    asset: parse_asset(asset),
                     source: from.into(),
                     destination: to.into(),
                     amount,

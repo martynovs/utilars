@@ -16,7 +16,8 @@ id_newtype!(
     WalletId
 );
 id_newtype!(
-    /// An asset resource name, e.g. `assets/native.ethereum-mainnet`.
+    /// An asset id — the bare segment after `assets/`, e.g. `native.ethereum-mainnet`. Assets are
+    /// global; the full `assets/{id}` resource name is built via [`AssetRef`], never stored here.
     AssetId
 );
 id_newtype!(
@@ -32,7 +33,8 @@ id_newtype!(
     TransactionId
 );
 id_newtype!(
-    /// An address-book entry resource name, e.g. `vaults/{v}/addressBookEntries/{id}`.
+    /// An address-book entry id — the bare segment after `addressBookEntries/`. The full
+    /// `vaults/{v}/addressBookEntries/{id}` name is built via [`AddressBookEntryRef`].
     AddressBookEntryId
 );
 id_newtype!(
@@ -54,6 +56,10 @@ id_newtype!(
 id_newtype!(
     /// A vault-action id — the segment after `actions/`.
     VaultActionId
+);
+id_newtype!(
+    /// An address-book-entry-group id — the bare segment after `addressBookEntryGroups/`.
+    AddressBookEntryGroupId
 );
 
 /// A typed resource reference parseable from its canonical resource name.
@@ -131,7 +137,16 @@ vault_ref!(
     /// A pending vault (quorum) action: `vaults/{vault}/actions/{action}`.
     VaultActionRef, "actions", action: VaultActionId
 );
+vault_ref!(
+    /// An address-book entry group: `vaults/{vault}/addressBookEntryGroups/{group}`.
+    AddressBookEntryGroupRef, "addressBookEntryGroups", group: AddressBookEntryGroupId
+);
 
+prefix_ref!(
+    /// An asset: `assets/{asset}`. Assets are global (never vault-scoped), so this single-prefix
+    /// ref is the canonical full name; the bridge re-adds/strips the `assets/` prefix.
+    AssetRef, "assets", asset: AssetId
+);
 prefix_ref!(
     /// A network: `networks/{network}`.
     NetworkRef, "networks", network: NetworkId
@@ -160,6 +175,15 @@ pub struct WalletAddressRef {
     pub address: AddressId,
 }
 
+impl WalletAddressRef {
+    /// The full `vaults/{vault}/wallets/{wallet}/addresses/{address}` resource name, from borrowed
+    /// parts — the no-clone builder (uniform with the macro-generated refs).
+    #[must_use]
+    pub fn resource_name(vault: &VaultId, wallet: &WalletId, address: &AddressId) -> String {
+        format!("vaults/{vault}/wallets/{wallet}/addresses/{address}")
+    }
+}
+
 impl ParseRef for WalletAddressRef {
     fn parse(resource_name: &str) -> Option<Self> {
         match resource_name.split('/').collect::<Vec<_>>().as_slice() {
@@ -175,11 +199,11 @@ impl ParseRef for WalletAddressRef {
 
 impl std::fmt::Display for WalletAddressRef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "vaults/{}/wallets/{}/addresses/{}",
-            self.vault, self.wallet, self.address
-        )
+        f.write_str(&Self::resource_name(
+            &self.vault,
+            &self.wallet,
+            &self.address,
+        ))
     }
 }
 
@@ -213,6 +237,77 @@ mod tests {
         assert_eq!(raw, ResourceName::Raw("not-a-name".to_string()));
         assert!(raw.as_ref().is_none());
         assert_eq!(raw.to_string(), "not-a-name");
+    }
+
+    #[test]
+    fn single_prefix_ref_bridge_round_trips() {
+        // Emit: a bare id becomes the full `{prefix}/{id}` wire name (one prefix, no doubling).
+        assert_eq!(
+            AssetRef::resource_name(&AssetId::new("native.ethereum-mainnet")),
+            "assets/native.ethereum-mainnet"
+        );
+        assert_eq!(
+            NetworkRef::resource_name(&NetworkId::new("ethereum-mainnet")),
+            "networks/ethereum-mainnet"
+        );
+
+        // Ingest: parse a prefixed wire name into a bare id via `Into`.
+        let asset: AssetId = AssetRef::parse("assets/native.ethereum-mainnet")
+            .unwrap()
+            .into();
+        assert_eq!(asset.as_str(), "native.ethereum-mainnet");
+        let network: NetworkId = NetworkRef::parse("networks/ethereum-mainnet")
+            .unwrap()
+            .into();
+        assert_eq!(network.as_str(), "ethereum-mainnet");
+        let vault: VaultId = VaultRef::parse("vaults/abc").unwrap().into();
+        assert_eq!(vault.as_str(), "abc");
+        let user: UserId = UserRef::parse("users/u").unwrap().into();
+        assert_eq!(user.as_str(), "u");
+
+        // A value with no prefix does not parse as a resource name.
+        assert!(AssetRef::parse("native.ethereum-mainnet").is_none());
+    }
+
+    #[test]
+    fn every_ref_builds_its_resource_name_from_borrows() {
+        let v = VaultId::new("v");
+        // Vault-scoped refs.
+        assert_eq!(
+            TransactionRef::resource_name(&v, &TransactionId::new("t")),
+            "vaults/v/transactions/t"
+        );
+        assert_eq!(
+            WalletRef::resource_name(&v, &WalletId::new("w")),
+            "vaults/v/wallets/w"
+        );
+        assert_eq!(
+            GasStationRef::resource_name(&v, &GasStationId::new("g")),
+            "vaults/v/gasStations/g"
+        );
+        assert_eq!(
+            AddressBookEntryRef::resource_name(&v, &AddressBookEntryId::new("e")),
+            "vaults/v/addressBookEntries/e"
+        );
+        assert_eq!(
+            TransactionRequestRef::resource_name(&v, &TransactionRequestId::new("r")),
+            "vaults/v/transactionRequests/r"
+        );
+        assert_eq!(
+            SimulationRef::resource_name(&v, &SimulationId::new("s")),
+            "vaults/v/transactionSimulations/s"
+        );
+        assert_eq!(
+            VaultActionRef::resource_name(&v, &VaultActionId::new("a")),
+            "vaults/v/actions/a"
+        );
+        assert_eq!(
+            WalletAddressRef::resource_name(&v, &WalletId::new("w"), &AddressId::new("a")),
+            "vaults/v/wallets/w/addresses/a"
+        );
+        // Single-prefix refs (Asset/Network covered in the bridge round-trip test).
+        assert_eq!(VaultRef::resource_name(&v), "vaults/v");
+        assert_eq!(UserRef::resource_name(&UserId::new("u")), "users/u");
     }
 
     #[test]

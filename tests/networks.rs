@@ -35,7 +35,7 @@ async fn networks_list_and_stream() {
     );
     assert_eq!(
         page.networks[0].native_asset.as_ref().unwrap().as_str(),
-        "assets/native.ethereum-mainnet"
+        "native.ethereum-mainnet"
     );
     assert!(page.networks[1].testnet);
 

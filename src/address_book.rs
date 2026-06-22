@@ -16,8 +16,8 @@ use crate::generated::types::{
 };
 use crate::generated::ClientAddressBookExt;
 use crate::resource::{
-    AddressBookEntryId, AddressBookEntryRef, NetworkId, ResourceName, UserRef, VaultActionRef,
-    VaultId, WalletRef,
+    AddressBookEntryGroupId, AddressBookEntryGroupRef, AddressBookEntryId, AddressBookEntryRef,
+    NetworkId, NetworkRef, ParseRef, ResourceName, UserRef, VaultActionRef, VaultId, WalletRef,
 };
 
 /// A labelled external address tracked in a vault's address book. `name` is the resource
@@ -45,7 +45,7 @@ impl From<V2AddressBookEntry> for AddressBookEntry {
             name: ResourceName::parse(e.name.unwrap_or_default()),
             display_name: (!e.display_name.is_empty()).then_some(e.display_name),
             address: e.address,
-            network: (!e.network.is_empty()).then(|| NetworkId::from(e.network)),
+            network: NetworkRef::parse(&e.network).map(NetworkId::from),
             note: e.note.filter(|s| !s.is_empty()),
             tracked: e.tracked.unwrap_or(false),
             associated_wallet: e
@@ -131,7 +131,7 @@ impl From<NewAddressBookEntry> for V2CreateAddressBookEntryRequest {
         Self {
             address: e.address,
             display_name: e.display_name,
-            network: e.network.to_string(),
+            network: NetworkRef::resource_name(&e.network),
             note: e.note,
         }
     }
@@ -177,13 +177,16 @@ impl<'a> AddressBook<'a> {
         }
     }
 
-    /// Retrieve multiple entries by resource name.
+    /// Retrieve multiple entries in a vault by id.
     pub async fn get_many(
         &self,
         vault: VaultId,
-        names: Vec<AddressBookEntryId>,
+        entries: &[AddressBookEntryId],
     ) -> Result<Vec<AddressBookEntry>> {
-        let names: Vec<String> = names.into_iter().map(|n| n.to_string()).collect();
+        let names: Vec<String> = entries
+            .iter()
+            .map(|entry| AddressBookEntryRef::resource_name(&vault, entry))
+            .collect();
         let resp = self
             .client
             .call(|api| {
@@ -243,17 +246,19 @@ impl<'a> AddressBook<'a> {
         require_action(resp.vault_action)
     }
 
-    /// Batch add existing entries to an address book entry group (e.g.
-    /// `vaults/{vault_id}/addressBookEntryGroups/{group_id}`). Initiates a quorum action.
+    /// Batch add existing entries to an address book entry group (by id). Initiates a quorum action.
     pub async fn batch_add_to_group(
         &self,
         vault: VaultId,
-        group: impl Into<String>,
-        names: Vec<AddressBookEntryId>,
+        group: AddressBookEntryGroupId,
+        entries: &[AddressBookEntryId],
     ) -> Result<VaultAction> {
         let body = AddressBookBatchAddAddressBookEntriesToGroupBody {
-            address_book_entry_group: group.into(),
-            names: names.into_iter().map(|n| n.to_string()).collect(),
+            address_book_entry_group: AddressBookEntryGroupRef::resource_name(&vault, &group),
+            names: entries
+                .iter()
+                .map(|entry| AddressBookEntryRef::resource_name(&vault, entry))
+                .collect(),
         };
         let resp = self
             .client

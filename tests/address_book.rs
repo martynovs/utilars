@@ -58,7 +58,7 @@ async fn address_book_list_passes_filter_and_parses() {
     assert_eq!(e.address, "0xabc");
     assert_eq!(
         e.network.as_ref().map(NetworkId::as_str),
-        Some("networks/ethereum-mainnet")
+        Some("ethereum-mainnet")
     );
     assert_eq!(e.note.as_deref(), Some("treasury"));
     assert!(e.tracked);
@@ -173,9 +173,7 @@ async fn address_book_get_many_batches_by_name() {
         .address_book()
         .get_many(
             VaultId::new("v1"),
-            vec![utilars::AddressBookEntryId::new(
-                "vaults/v1/addressBookEntries/e1",
-            )],
+            &[utilars::AddressBookEntryId::new("e1")],
         )
         .await
         .unwrap();
@@ -295,10 +293,8 @@ async fn address_book_batch_add_to_group_returns_action() {
         .address_book()
         .batch_add_to_group(
             VaultId::new("v1"),
-            "vaults/v1/addressBookEntryGroups/g1",
-            vec![utilars::AddressBookEntryId::new(
-                "vaults/v1/addressBookEntries/e1",
-            )],
+            utilars::AddressBookEntryGroupId::new("g1"),
+            &[utilars::AddressBookEntryId::new("e1")],
         )
         .await
         .unwrap();
