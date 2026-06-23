@@ -160,6 +160,8 @@ pub enum TransactionKind {
     Transaction,
     /// A message to sign (e.g. `personal_sign` / typed data).
     Message,
+    /// The API returned the proto unspecified sentinel (type not set).
+    Unspecified,
 }
 
 impl From<V2TransactionTypeEnum> for TransactionKind {
@@ -167,6 +169,7 @@ impl From<V2TransactionTypeEnum> for TransactionKind {
         match t {
             V2TransactionTypeEnum::Transaction => Self::Transaction,
             V2TransactionTypeEnum::Message => Self::Message,
+            V2TransactionTypeEnum::EnumUnspecified => Self::Unspecified,
         }
     }
 }
@@ -1024,6 +1027,10 @@ mod tests {
         assert_eq!(
             TransactionKind::from(V2TransactionTypeEnum::Message),
             TransactionKind::Message
+        );
+        assert_eq!(
+            TransactionKind::from(V2TransactionTypeEnum::EnumUnspecified),
+            TransactionKind::Unspecified
         );
     }
 

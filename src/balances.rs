@@ -83,6 +83,8 @@ pub enum UtxoState {
     Available,
     Locked,
     Frozen,
+    /// The API returned the proto unspecified sentinel (state not set).
+    Unspecified,
 }
 
 impl From<V2UtxoState> for UtxoState {
@@ -91,6 +93,7 @@ impl From<V2UtxoState> for UtxoState {
             V2UtxoState::Available => Self::Available,
             V2UtxoState::Locked => Self::Locked,
             V2UtxoState::Frozen => Self::Frozen,
+            V2UtxoState::EnumUnspecified => Self::Unspecified,
         }
     }
 }
@@ -733,6 +736,10 @@ mod tests {
         );
         assert_eq!(UtxoState::from(V2UtxoState::Locked), UtxoState::Locked);
         assert_eq!(UtxoState::from(V2UtxoState::Frozen), UtxoState::Frozen);
+        assert_eq!(
+            UtxoState::from(V2UtxoState::EnumUnspecified),
+            UtxoState::Unspecified
+        );
     }
 
     #[test]

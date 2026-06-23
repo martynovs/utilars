@@ -98,11 +98,47 @@ fn short_sha(sha256: &str) -> String {
     sha256.chars().take(12).collect()
 }
 
+/// The proto3 zero-value enum sentinel grpc-gateway emits for unset enum fields.
+const ENUM_SENTINEL: &str = "ENUM_UNSPECIFIED";
+
+/// Recursively append [`ENUM_SENTINEL`] to every string `enum` array in the spec that lacks it,
+/// so the generated strict enums can deserialize the proto unspecified value. Idempotent: arrays
+/// that already contain the sentinel (or aren't all-strings) are left untouched.
+fn inject_enum_unspecified(node: &mut serde_json::Value) {
+    match node {
+        serde_json::Value::Object(map) => {
+            if let Some(serde_json::Value::Array(values)) = map.get_mut("enum") {
+                let all_strings =
+                    !values.is_empty() && values.iter().all(serde_json::Value::is_string);
+                let has_sentinel = values.iter().any(|v| v.as_str() == Some(ENUM_SENTINEL));
+                if all_strings && !has_sentinel {
+                    values.push(serde_json::Value::String(ENUM_SENTINEL.to_string()));
+                }
+            }
+            for value in map.values_mut() {
+                inject_enum_unspecified(value);
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for item in items.iter_mut() {
+                inject_enum_unspecified(item);
+            }
+        }
+        _ => {}
+    }
+}
+
 /// Generate the client from the vendored spec.
 fn gen() -> Result<()> {
     let raw = fs::read_to_string(SPEC_PATH)
         .with_context(|| format!("read {SPEC_PATH} (run `cargo xtask pull` first)"))?;
-    let spec: openapiv3::OpenAPI = serde_json::from_str(&raw)?;
+    // Proto3 enums carry a zero-value sentinel (`ENUM_UNSPECIFIED`) that grpc-gateway emits for
+    // unset fields, but the vendored OpenAPI omits it — so progenitor's strict enums fail to
+    // deserialize real responses (e.g. an unset `transactionRequest.origin`). Inject the sentinel
+    // into every string enum before codegen so each generated enum can round-trip it.
+    let mut doc: serde_json::Value = serde_json::from_str(&raw)?;
+    inject_enum_unspecified(&mut doc);
+    let spec: openapiv3::OpenAPI = serde_json::from_value(doc)?;
 
     let mut settings = GenerationSettings::default();
     settings

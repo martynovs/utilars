@@ -51,6 +51,8 @@ pub enum NetworkStatus {
     Disabled,
     /// Supported but slated for removal.
     Deprecated,
+    /// The API returned the proto unspecified sentinel (status not set).
+    Unspecified,
 }
 
 impl From<V2NetworkStatusEnum> for NetworkStatus {
@@ -59,6 +61,7 @@ impl From<V2NetworkStatusEnum> for NetworkStatus {
             V2NetworkStatusEnum::Active => Self::Active,
             V2NetworkStatusEnum::Disabled => Self::Disabled,
             V2NetworkStatusEnum::Deprecated => Self::Deprecated,
+            V2NetworkStatusEnum::EnumUnspecified => Self::Unspecified,
         }
     }
 }
@@ -280,6 +283,10 @@ mod tests {
         assert_eq!(
             NetworkStatus::from(V2NetworkStatusEnum::Deprecated),
             NetworkStatus::Deprecated
+        );
+        assert_eq!(
+            NetworkStatus::from(V2NetworkStatusEnum::EnumUnspecified),
+            NetworkStatus::Unspecified
         );
     }
 }

@@ -171,7 +171,8 @@ Format: `vaults/{vault_id}/addressBookEntries/{entry_id}`*/
     ///    "VIEWER",
     ///    "OWNER",
     ///    "NON_SIGNING_OPERATOR",
-    ///    "NON_SIGNING_ADMIN"
+    ///    "NON_SIGNING_ADMIN",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -201,6 +202,8 @@ Format: `vaults/{vault_id}/addressBookEntries/{entry_id}`*/
         NonSigningOperator,
         #[serde(rename = "NON_SIGNING_ADMIN")]
         NonSigningAdmin,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for ApiUserRoleEnum {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
@@ -211,6 +214,7 @@ Format: `vaults/{vault_id}/addressBookEntries/{entry_id}`*/
                 Self::Owner => f.write_str("OWNER"),
                 Self::NonSigningOperator => f.write_str("NON_SIGNING_OPERATOR"),
                 Self::NonSigningAdmin => f.write_str("NON_SIGNING_ADMIN"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -226,6 +230,7 @@ Format: `vaults/{vault_id}/addressBookEntries/{entry_id}`*/
                 "OWNER" => Ok(Self::Owner),
                 "NON_SIGNING_OPERATOR" => Ok(Self::NonSigningOperator),
                 "NON_SIGNING_ADMIN" => Ok(Self::NonSigningAdmin),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -263,7 +268,8 @@ Format: `vaults/{vault_id}/addressBookEntries/{entry_id}`*/
     ///  "type": "string",
     ///  "enum": [
     ///    "PENDING",
-    ///    "ACTIVE"
+    ///    "ACTIVE",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -285,12 +291,15 @@ Format: `vaults/{vault_id}/addressBookEntries/{entry_id}`*/
         Pending,
         #[serde(rename = "ACTIVE")]
         Active,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for ApiUserStatusEnum {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
             match *self {
                 Self::Pending => f.write_str("PENDING"),
                 Self::Active => f.write_str("ACTIVE"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -302,6 +311,7 @@ Format: `vaults/{vault_id}/addressBookEntries/{entry_id}`*/
             match value {
                 "PENDING" => Ok(Self::Pending),
                 "ACTIVE" => Ok(Self::Active),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -339,7 +349,8 @@ Format: `vaults/{vault_id}/addressBookEntries/{entry_id}`*/
     ///  "type": "string",
     ///  "enum": [
     ///    "USER_ACCOUNT",
-    ///    "SERVICE_ACCOUNT"
+    ///    "SERVICE_ACCOUNT",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -361,12 +372,15 @@ Format: `vaults/{vault_id}/addressBookEntries/{entry_id}`*/
         UserAccount,
         #[serde(rename = "SERVICE_ACCOUNT")]
         ServiceAccount,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for ApiUserTypeEnum {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
             match *self {
                 Self::UserAccount => f.write_str("USER_ACCOUNT"),
                 Self::ServiceAccount => f.write_str("SERVICE_ACCOUNT"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -378,6 +392,7 @@ Format: `vaults/{vault_id}/addressBookEntries/{entry_id}`*/
             match value {
                 "USER_ACCOUNT" => Ok(Self::UserAccount),
                 "SERVICE_ACCOUNT" => Ok(Self::ServiceAccount),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -1038,7 +1053,8 @@ See https://developers.stellar.org/docs/learn/fundamentals/transactions/operatio
     ///    "TEXT",
     ///    "ID",
     ///    "HASH",
-    ///    "RETURN"
+    ///    "RETURN",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -1064,6 +1080,8 @@ See https://developers.stellar.org/docs/learn/fundamentals/transactions/operatio
         Hash,
         #[serde(rename = "RETURN")]
         Return,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for Apiv2StellarTransactionMemoTypeEnum {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
@@ -1072,6 +1090,7 @@ See https://developers.stellar.org/docs/learn/fundamentals/transactions/operatio
                 Self::Id => f.write_str("ID"),
                 Self::Hash => f.write_str("HASH"),
                 Self::Return => f.write_str("RETURN"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -1085,6 +1104,7 @@ See https://developers.stellar.org/docs/learn/fundamentals/transactions/operatio
                 "ID" => Ok(Self::Id),
                 "HASH" => Ok(Self::Hash),
                 "RETURN" => Ok(Self::Return),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -1522,7 +1542,8 @@ Can be one of the following:
     ///  "type": "string",
     ///  "enum": [
     ///    "BANDWIDTH",
-    ///    "ENERGY"
+    ///    "ENERGY",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -1544,12 +1565,15 @@ Can be one of the following:
         Bandwidth,
         #[serde(rename = "ENERGY")]
         Energy,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for Apiv2TronTransactionTronResourceEnum {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
             match *self {
                 Self::Bandwidth => f.write_str("BANDWIDTH"),
                 Self::Energy => f.write_str("ENERGY"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -1561,6 +1585,7 @@ Can be one of the following:
             match value {
                 "BANDWIDTH" => Ok(Self::Bandwidth),
                 "ENERGY" => Ok(Self::Energy),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -2150,7 +2175,8 @@ held in a single contract.
     ///    "SPL_TOKEN_2022",
     ///    "ICS20",
     ///    "JETTON",
-    ///    "TIP20"
+    ///    "TIP20",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -2186,6 +2212,8 @@ held in a single contract.
         Jetton,
         #[serde(rename = "TIP20")]
         Tip20,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for AssetTokenInfoStandardEnum {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
@@ -2199,6 +2227,7 @@ held in a single contract.
                 Self::Ics20 => f.write_str("ICS20"),
                 Self::Jetton => f.write_str("JETTON"),
                 Self::Tip20 => f.write_str("TIP20"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -2217,6 +2246,7 @@ held in a single contract.
                 "ICS20" => Ok(Self::Ics20),
                 "JETTON" => Ok(Self::Jetton),
                 "TIP20" => Ok(Self::Tip20),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -4776,7 +4806,8 @@ Ordered as they appear on-chain (root first, then internal children).*/
     ///  "type": "string",
     ///  "enum": [
     ///    "CHAINALYSIS",
-    ///    "ELLIPTIC"
+    ///    "ELLIPTIC",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -4798,12 +4829,15 @@ Ordered as they appear on-chain (root first, then internal children).*/
         Chainalysis,
         #[serde(rename = "ELLIPTIC")]
         Elliptic,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for TransactionAmlScreeningProviderEnum {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
             match *self {
                 Self::Chainalysis => f.write_str("CHAINALYSIS"),
                 Self::Elliptic => f.write_str("ELLIPTIC"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -4815,6 +4849,7 @@ Ordered as they appear on-chain (root first, then internal children).*/
             match value {
                 "CHAINALYSIS" => Ok(Self::Chainalysis),
                 "ELLIPTIC" => Ok(Self::Elliptic),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -5101,7 +5136,8 @@ Ordered as they appear on-chain (root first, then internal children).*/
     ///  "type": "string",
     ///  "enum": [
     ///    "PERSONAL_SIGN",
-    ///    "SIGN_TYPED_DATA_V4"
+    ///    "SIGN_TYPED_DATA_V4",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -5123,12 +5159,15 @@ Ordered as they appear on-chain (root first, then internal children).*/
         PersonalSign,
         #[serde(rename = "SIGN_TYPED_DATA_V4")]
         SignTypedDataV4,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for TransactionEvmMessageTypeEnum {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
             match *self {
                 Self::PersonalSign => f.write_str("PERSONAL_SIGN"),
                 Self::SignTypedDataV4 => f.write_str("SIGN_TYPED_DATA_V4"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -5140,6 +5179,7 @@ Ordered as they appear on-chain (root first, then internal children).*/
             match value {
                 "PERSONAL_SIGN" => Ok(Self::PersonalSign),
                 "SIGN_TYPED_DATA_V4" => Ok(Self::SignTypedDataV4),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -5318,7 +5358,8 @@ Ordered as they appear on-chain (root first, then internal children).*/
     ///  "type": "string",
     ///  "enum": [
     ///    "WALLET_CONNECT",
-    ///    "EXTENSION"
+    ///    "EXTENSION",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -5340,12 +5381,15 @@ Ordered as they appear on-chain (root first, then internal children).*/
         WalletConnect,
         #[serde(rename = "EXTENSION")]
         Extension,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for TransactionRequestOriginEnum {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
             match *self {
                 Self::WalletConnect => f.write_str("WALLET_CONNECT"),
                 Self::Extension => f.write_str("EXTENSION"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -5357,6 +5401,7 @@ Ordered as they appear on-chain (root first, then internal children).*/
             match value {
                 "WALLET_CONNECT" => Ok(Self::WalletConnect),
                 "EXTENSION" => Ok(Self::Extension),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -6384,7 +6429,8 @@ Example: `1.1`.*/
     ///  "type": "string",
     ///  "enum": [
     ///    "BASIC",
-    ///    "FULL"
+    ///    "FULL",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -6406,12 +6452,15 @@ Example: `1.1`.*/
         Basic,
         #[serde(rename = "FULL")]
         Full,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for TransactionsBatchGetTransactionsView {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
             match *self {
                 Self::Basic => f.write_str("BASIC"),
                 Self::Full => f.write_str("FULL"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -6423,6 +6472,7 @@ Example: `1.1`.*/
             match value {
                 "BASIC" => Ok(Self::Basic),
                 "FULL" => Ok(Self::Full),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -6507,7 +6557,8 @@ Choose one of the available messages.*/
     ///  "type": "string",
     ///  "enum": [
     ///    "BASIC",
-    ///    "FULL"
+    ///    "FULL",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -6529,12 +6580,15 @@ Choose one of the available messages.*/
         Basic,
         #[serde(rename = "FULL")]
         Full,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for TransactionsGetTransactionView {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
             match *self {
                 Self::Basic => f.write_str("BASIC"),
                 Self::Full => f.write_str("FULL"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -6546,6 +6600,7 @@ Choose one of the available messages.*/
             match value {
                 "BASIC" => Ok(Self::Basic),
                 "FULL" => Ok(Self::Full),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -6750,7 +6805,8 @@ not supported (00000000-0000-0000-0000-000000000000).*/
     ///  "type": "string",
     ///  "enum": [
     ///    "BASIC",
-    ///    "FULL"
+    ///    "FULL",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -6772,12 +6828,15 @@ not supported (00000000-0000-0000-0000-000000000000).*/
         Basic,
         #[serde(rename = "FULL")]
         Full,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for TransactionsListTransactionsView {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
             match *self {
                 Self::Basic => f.write_str("BASIC"),
                 Self::Full => f.write_str("FULL"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -6789,6 +6848,7 @@ not supported (00000000-0000-0000-0000-000000000000).*/
             match value {
                 "BASIC" => Ok(Self::Basic),
                 "FULL" => Ok(Self::Full),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -7250,7 +7310,8 @@ Format: `networks/{network_id}`*/
     ///  "enum": [
     ///    "DENY",
     ///    "ALLOW",
-    ///    "ALERT"
+    ///    "ALERT",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -7274,6 +7335,8 @@ Format: `networks/{network_id}`*/
         Allow,
         #[serde(rename = "ALERT")]
         Alert,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for V2AmlActionEnum {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
@@ -7281,6 +7344,7 @@ Format: `networks/{network_id}`*/
                 Self::Deny => f.write_str("DENY"),
                 Self::Allow => f.write_str("ALLOW"),
                 Self::Alert => f.write_str("ALERT"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -7293,6 +7357,7 @@ Format: `networks/{network_id}`*/
                 "DENY" => Ok(Self::Deny),
                 "ALLOW" => Ok(Self::Allow),
                 "ALERT" => Ok(Self::Alert),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -7715,7 +7780,8 @@ The sponsor must be a Utila-managed wallet with sufficient balance to pay transa
     ///  "type": "string",
     ///  "enum": [
     ///    "NATIVE_CURRENCY",
-    ///    "TOKEN"
+    ///    "TOKEN",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -7737,12 +7803,15 @@ The sponsor must be a Utila-managed wallet with sufficient balance to pay transa
         NativeCurrency,
         #[serde(rename = "TOKEN")]
         Token,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for V2AssetTypeEnum {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
             match *self {
                 Self::NativeCurrency => f.write_str("NATIVE_CURRENCY"),
                 Self::Token => f.write_str("TOKEN"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -7754,6 +7823,7 @@ The sponsor must be a Utila-managed wallet with sufficient balance to pay transa
             match value {
                 "NATIVE_CURRENCY" => Ok(Self::NativeCurrency),
                 "TOKEN" => Ok(Self::Token),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -10756,7 +10826,8 @@ Format: `vaults/{vault_id}/wallets/{wallet_id}/addresses/{address_id}`*/
     ///  "enum": [
     ///    "ACTIVE",
     ///    "DISABLED",
-    ///    "DEPRECATED"
+    ///    "DEPRECATED",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -10780,6 +10851,8 @@ Format: `vaults/{vault_id}/wallets/{wallet_id}/addresses/{address_id}`*/
         Disabled,
         #[serde(rename = "DEPRECATED")]
         Deprecated,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for V2NetworkStatusEnum {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
@@ -10787,6 +10860,7 @@ Format: `vaults/{vault_id}/wallets/{wallet_id}/addresses/{address_id}`*/
                 Self::Active => f.write_str("ACTIVE"),
                 Self::Disabled => f.write_str("DISABLED"),
                 Self::Deprecated => f.write_str("DEPRECATED"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -10799,6 +10873,7 @@ Format: `vaults/{vault_id}/wallets/{wallet_id}/addresses/{address_id}`*/
                 "ACTIVE" => Ok(Self::Active),
                 "DISABLED" => Ok(Self::Disabled),
                 "DEPRECATED" => Ok(Self::Deprecated),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -11468,7 +11543,8 @@ The key is the resource name and the value is the corresponding resource.*/
     ///    "SKIPPED",
     ///    "PENDING",
     ///    "FAILED",
-    ///    "READY"
+    ///    "READY",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -11494,6 +11570,8 @@ The key is the resource name and the value is the corresponding resource.*/
         Failed,
         #[serde(rename = "READY")]
         Ready,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for V2ScreeningStateEnum {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
@@ -11502,6 +11580,7 @@ The key is the resource name and the value is the corresponding resource.*/
                 Self::Pending => f.write_str("PENDING"),
                 Self::Failed => f.write_str("FAILED"),
                 Self::Ready => f.write_str("READY"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -11515,6 +11594,7 @@ The key is the resource name and the value is the corresponding resource.*/
                 "PENDING" => Ok(Self::Pending),
                 "FAILED" => Ok(Self::Failed),
                 "READY" => Ok(Self::Ready),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -12585,7 +12665,8 @@ Contains partial signatures that the dApp can use to finalize and broadcast.*/
     ///  "type": "string",
     ///  "enum": [
     ///    "INCOMING",
-    ///    "OUTGOING"
+    ///    "OUTGOING",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -12607,12 +12688,15 @@ Contains partial signatures that the dApp can use to finalize and broadcast.*/
         Incoming,
         #[serde(rename = "OUTGOING")]
         Outgoing,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for V2TransactionDirectionEnum {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
             match *self {
                 Self::Incoming => f.write_str("INCOMING"),
                 Self::Outgoing => f.write_str("OUTGOING"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -12624,6 +12708,7 @@ Contains partial signatures that the dApp can use to finalize and broadcast.*/
             match value {
                 "INCOMING" => Ok(Self::Incoming),
                 "OUTGOING" => Ok(Self::Outgoing),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -13058,7 +13143,8 @@ Translates to network specific priority values.
     ///  "enum": [
     ///    "LOW",
     ///    "NORMAL",
-    ///    "HIGH"
+    ///    "HIGH",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -13082,6 +13168,8 @@ Translates to network specific priority values.
         Normal,
         #[serde(rename = "HIGH")]
         High,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for V2TransactionPriorityEnum {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
@@ -13089,6 +13177,7 @@ Translates to network specific priority values.
                 Self::Low => f.write_str("LOW"),
                 Self::Normal => f.write_str("NORMAL"),
                 Self::High => f.write_str("HIGH"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -13101,6 +13190,7 @@ Translates to network specific priority values.
                 "LOW" => Ok(Self::Low),
                 "NORMAL" => Ok(Self::Normal),
                 "HIGH" => Ok(Self::High),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -13142,7 +13232,8 @@ Translates to network specific priority values.
     ///  "type": "string",
     ///  "enum": [
     ///    "CANCEL",
-    ///    "ACCELERATE"
+    ///    "ACCELERATE",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -13164,12 +13255,15 @@ Translates to network specific priority values.
         Cancel,
         #[serde(rename = "ACCELERATE")]
         Accelerate,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for V2TransactionReplacementTypeEnum {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
             match *self {
                 Self::Cancel => f.write_str("CANCEL"),
                 Self::Accelerate => f.write_str("ACCELERATE"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -13181,6 +13275,7 @@ Translates to network specific priority values.
             match value {
                 "CANCEL" => Ok(Self::Cancel),
                 "ACCELERATE" => Ok(Self::Accelerate),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -13764,7 +13859,8 @@ Relevant only for outgoing transactions.
     ///    "CANCELED",
     ///    "DROPPED",
     ///    "CONFIRMED",
-    ///    "EXPIRED"
+    ///    "EXPIRED",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -13816,6 +13912,8 @@ Relevant only for outgoing transactions.
         Confirmed,
         #[serde(rename = "EXPIRED")]
         Expired,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for V2TransactionStateEnum {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
@@ -13837,6 +13935,7 @@ Relevant only for outgoing transactions.
                 Self::Dropped => f.write_str("DROPPED"),
                 Self::Confirmed => f.write_str("CONFIRMED"),
                 Self::Expired => f.write_str("EXPIRED"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -13863,6 +13962,7 @@ Relevant only for outgoing transactions.
                 "DROPPED" => Ok(Self::Dropped),
                 "CONFIRMED" => Ok(Self::Confirmed),
                 "EXPIRED" => Ok(Self::Expired),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -14069,7 +14169,8 @@ Relevant only for outgoing transactions.
     ///    "TEXT",
     ///    "ID",
     ///    "HASH",
-    ///    "RETURN"
+    ///    "RETURN",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -14095,6 +14196,8 @@ Relevant only for outgoing transactions.
         Hash,
         #[serde(rename = "RETURN")]
         Return,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for V2TransactionStellarTransactionMemoTypeEnum {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
@@ -14103,6 +14206,7 @@ Relevant only for outgoing transactions.
                 Self::Id => f.write_str("ID"),
                 Self::Hash => f.write_str("HASH"),
                 Self::Return => f.write_str("RETURN"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -14116,6 +14220,7 @@ Relevant only for outgoing transactions.
                 "ID" => Ok(Self::Id),
                 "HASH" => Ok(Self::Hash),
                 "RETURN" => Ok(Self::Return),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -14184,7 +14289,8 @@ Relevant only for outgoing transactions.
     ///    "BTC_SIGN_MESSAGE",
     ///    "ALEO_SHIELD",
     ///    "ALEO_UNSHIELD",
-    ///    "ALEO_CONSOLIDATE"
+    ///    "ALEO_CONSOLIDATE",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -14264,6 +14370,8 @@ Relevant only for outgoing transactions.
         AleoUnshield,
         #[serde(rename = "ALEO_CONSOLIDATE")]
         AleoConsolidate,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for V2TransactionSubTypeEnum {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
@@ -14309,6 +14417,7 @@ Relevant only for outgoing transactions.
                 Self::AleoShield => f.write_str("ALEO_SHIELD"),
                 Self::AleoUnshield => f.write_str("ALEO_UNSHIELD"),
                 Self::AleoConsolidate => f.write_str("ALEO_CONSOLIDATE"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -14349,6 +14458,7 @@ Relevant only for outgoing transactions.
                 "ALEO_SHIELD" => Ok(Self::AleoShield),
                 "ALEO_UNSHIELD" => Ok(Self::AleoUnshield),
                 "ALEO_CONSOLIDATE" => Ok(Self::AleoConsolidate),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -15112,7 +15222,8 @@ A base58 string address (example: `TZ4UXDV5ZhNW7fb2AMSbgfAEZ7hWsnYS2g`)*/
     ///  "type": "string",
     ///  "enum": [
     ///    "BANDWIDTH",
-    ///    "ENERGY"
+    ///    "ENERGY",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -15134,12 +15245,15 @@ A base58 string address (example: `TZ4UXDV5ZhNW7fb2AMSbgfAEZ7hWsnYS2g`)*/
         Bandwidth,
         #[serde(rename = "ENERGY")]
         Energy,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for V2TransactionTronTransactionTronResourceEnum {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
             match *self {
                 Self::Bandwidth => f.write_str("BANDWIDTH"),
                 Self::Energy => f.write_str("ENERGY"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -15151,6 +15265,7 @@ A base58 string address (example: `TZ4UXDV5ZhNW7fb2AMSbgfAEZ7hWsnYS2g`)*/
             match value {
                 "BANDWIDTH" => Ok(Self::Bandwidth),
                 "ENERGY" => Ok(Self::Energy),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -15580,7 +15695,8 @@ A base58 string address (example: `TZ4UXDV5ZhNW7fb2AMSbgfAEZ7hWsnYS2g`)*/
     ///  "type": "string",
     ///  "enum": [
     ///    "TRANSACTION",
-    ///    "MESSAGE"
+    ///    "MESSAGE",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -15602,12 +15718,15 @@ A base58 string address (example: `TZ4UXDV5ZhNW7fb2AMSbgfAEZ7hWsnYS2g`)*/
         Transaction,
         #[serde(rename = "MESSAGE")]
         Message,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for V2TransactionTypeEnum {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
             match *self {
                 Self::Transaction => f.write_str("TRANSACTION"),
                 Self::Message => f.write_str("MESSAGE"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -15619,6 +15738,7 @@ A base58 string address (example: `TZ4UXDV5ZhNW7fb2AMSbgfAEZ7hWsnYS2g`)*/
             match value {
                 "TRANSACTION" => Ok(Self::Transaction),
                 "MESSAGE" => Ok(Self::Message),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -15658,7 +15778,8 @@ A base58 string address (example: `TZ4UXDV5ZhNW7fb2AMSbgfAEZ7hWsnYS2g`)*/
     ///  "type": "string",
     ///  "enum": [
     ///    "BASIC",
-    ///    "FULL"
+    ///    "FULL",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -15680,12 +15801,15 @@ A base58 string address (example: `TZ4UXDV5ZhNW7fb2AMSbgfAEZ7hWsnYS2g`)*/
         Basic,
         #[serde(rename = "FULL")]
         Full,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for V2TransactionView {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
             match *self {
                 Self::Basic => f.write_str("BASIC"),
                 Self::Full => f.write_str("FULL"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -15697,6 +15821,7 @@ A base58 string address (example: `TZ4UXDV5ZhNW7fb2AMSbgfAEZ7hWsnYS2g`)*/
             match value {
                 "BASIC" => Ok(Self::Basic),
                 "FULL" => Ok(Self::Full),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -16207,7 +16332,8 @@ Can be one of the following:
     ///  "enum": [
     ///    "AVAILABLE",
     ///    "LOCKED",
-    ///    "FROZEN"
+    ///    "FROZEN",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -16231,6 +16357,8 @@ Can be one of the following:
         Locked,
         #[serde(rename = "FROZEN")]
         Frozen,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for V2UtxoState {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
@@ -16238,6 +16366,7 @@ Can be one of the following:
                 Self::Available => f.write_str("AVAILABLE"),
                 Self::Locked => f.write_str("LOCKED"),
                 Self::Frozen => f.write_str("FROZEN"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -16250,6 +16379,7 @@ Can be one of the following:
                 "AVAILABLE" => Ok(Self::Available),
                 "LOCKED" => Ok(Self::Locked),
                 "FROZEN" => Ok(Self::Frozen),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -16448,7 +16578,8 @@ Format: `vaults/{vault_id}/actions/{action_id}`*/
     ///    "FINISHED",
     ///    "FAILED",
     ///    "CANCELED",
-    ///    "EXPIRED"
+    ///    "EXPIRED",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -16482,6 +16613,8 @@ Format: `vaults/{vault_id}/actions/{action_id}`*/
         Canceled,
         #[serde(rename = "EXPIRED")]
         Expired,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for V2VaultActionStatusEnum {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
@@ -16494,6 +16627,7 @@ Format: `vaults/{vault_id}/actions/{action_id}`*/
                 Self::Failed => f.write_str("FAILED"),
                 Self::Canceled => f.write_str("CANCELED"),
                 Self::Expired => f.write_str("EXPIRED"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -16511,6 +16645,7 @@ Format: `vaults/{vault_id}/actions/{action_id}`*/
                 "FAILED" => Ok(Self::Failed),
                 "CANCELED" => Ok(Self::Canceled),
                 "EXPIRED" => Ok(Self::Expired),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -16549,7 +16684,8 @@ Format: `vaults/{vault_id}/actions/{action_id}`*/
     ///  "type": "string",
     ///  "enum": [
     ///    "APPROVE",
-    ///    "DENY"
+    ///    "DENY",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -16571,12 +16707,15 @@ Format: `vaults/{vault_id}/actions/{action_id}`*/
         Approve,
         #[serde(rename = "DENY")]
         Deny,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for V2VoteOnTransactionRequestRequestVote {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
             match *self {
                 Self::Approve => f.write_str("APPROVE"),
                 Self::Deny => f.write_str("DENY"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -16588,6 +16727,7 @@ Format: `vaults/{vault_id}/actions/{action_id}`*/
             match value {
                 "APPROVE" => Ok(Self::Approve),
                 "DENY" => Ok(Self::Deny),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -17146,7 +17286,8 @@ Format: `vaults/{vault_id}/wallets/{wallet_id}/addresses/{address_id}`*/
     ///  "enum": [
     ///    "MAIN",
     ///    "DEPOSIT",
-    ///    "CHANGE"
+    ///    "CHANGE",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -17170,6 +17311,8 @@ Format: `vaults/{vault_id}/wallets/{wallet_id}/addresses/{address_id}`*/
         Deposit,
         #[serde(rename = "CHANGE")]
         Change,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for V2WalletAddressType {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
@@ -17177,6 +17320,7 @@ Format: `vaults/{vault_id}/wallets/{wallet_id}/addresses/{address_id}`*/
                 Self::Main => f.write_str("MAIN"),
                 Self::Deposit => f.write_str("DEPOSIT"),
                 Self::Change => f.write_str("CHANGE"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -17189,6 +17333,7 @@ Format: `vaults/{vault_id}/wallets/{wallet_id}/addresses/{address_id}`*/
                 "MAIN" => Ok(Self::Main),
                 "DEPOSIT" => Ok(Self::Deposit),
                 "CHANGE" => Ok(Self::Change),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -17491,7 +17636,8 @@ Format: `vaults/{vault_id}/wallets/{wallet_id}`*/
     ///  "type": "string",
     ///  "enum": [
     ///    "BASIC",
-    ///    "FULL"
+    ///    "FULL",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -17513,12 +17659,15 @@ Format: `vaults/{vault_id}/wallets/{wallet_id}`*/
         Basic,
         #[serde(rename = "FULL")]
         Full,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for V2WalletView {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
             match *self {
                 Self::Basic => f.write_str("BASIC"),
                 Self::Full => f.write_str("FULL"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -17530,6 +17679,7 @@ Format: `vaults/{vault_id}/wallets/{wallet_id}`*/
             match value {
                 "BASIC" => Ok(Self::Basic),
                 "FULL" => Ok(Self::Full),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -17711,7 +17861,8 @@ Format: `networks/{network_id}`.*/
     ///    "BASE58",
     ///    "TON_NON_BOUNCEABLE",
     ///    "SUBSTRATE_58",
-    ///    "BITCOIN_P2TR"
+    ///    "BITCOIN_P2TR",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -17745,6 +17896,8 @@ Format: `networks/{network_id}`.*/
         Substrate58,
         #[serde(rename = "BITCOIN_P2TR")]
         BitcoinP2tr,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for WalletAddressFormat {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
@@ -17757,6 +17910,7 @@ Format: `networks/{network_id}`.*/
                 Self::TonNonBounceable => f.write_str("TON_NON_BOUNCEABLE"),
                 Self::Substrate58 => f.write_str("SUBSTRATE_58"),
                 Self::BitcoinP2tr => f.write_str("BITCOIN_P2TR"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -17774,6 +17928,7 @@ Format: `networks/{network_id}`.*/
                 "TON_NON_BOUNCEABLE" => Ok(Self::TonNonBounceable),
                 "SUBSTRATE_58" => Ok(Self::Substrate58),
                 "BITCOIN_P2TR" => Ok(Self::BitcoinP2tr),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -18117,7 +18272,8 @@ Format: `vaults/{vault_id}/wallets/{wallet_id}`*/
     ///  "type": "string",
     ///  "enum": [
     ///    "BASIC",
-    ///    "FULL"
+    ///    "FULL",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -18139,12 +18295,15 @@ Format: `vaults/{vault_id}/wallets/{wallet_id}`*/
         Basic,
         #[serde(rename = "FULL")]
         Full,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for WalletsBatchGetWalletsView {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
             match *self {
                 Self::Basic => f.write_str("BASIC"),
                 Self::Full => f.write_str("FULL"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -18156,6 +18315,7 @@ Format: `vaults/{vault_id}/wallets/{wallet_id}`*/
             match value {
                 "BASIC" => Ok(Self::Basic),
                 "FULL" => Ok(Self::Full),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -18239,7 +18399,8 @@ Format: `vaults/{vault_id}/wallets/{wallet_id}`*/
     ///  "type": "string",
     ///  "enum": [
     ///    "BASIC",
-    ///    "FULL"
+    ///    "FULL",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -18261,12 +18422,15 @@ Format: `vaults/{vault_id}/wallets/{wallet_id}`*/
         Basic,
         #[serde(rename = "FULL")]
         Full,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for WalletsGetWalletView {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
             match *self {
                 Self::Basic => f.write_str("BASIC"),
                 Self::Full => f.write_str("FULL"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -18278,6 +18442,7 @@ Format: `vaults/{vault_id}/wallets/{wallet_id}`*/
             match value {
                 "BASIC" => Ok(Self::Basic),
                 "FULL" => Ok(Self::Full),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }
@@ -18315,7 +18480,8 @@ Format: `vaults/{vault_id}/wallets/{wallet_id}`*/
     ///  "type": "string",
     ///  "enum": [
     ///    "BASIC",
-    ///    "FULL"
+    ///    "FULL",
+    ///    "ENUM_UNSPECIFIED"
     ///  ]
     ///}
     /// ```
@@ -18337,12 +18503,15 @@ Format: `vaults/{vault_id}/wallets/{wallet_id}`*/
         Basic,
         #[serde(rename = "FULL")]
         Full,
+        #[serde(rename = "ENUM_UNSPECIFIED")]
+        EnumUnspecified,
     }
     impl ::std::fmt::Display for WalletsListWalletsView {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
             match *self {
                 Self::Basic => f.write_str("BASIC"),
                 Self::Full => f.write_str("FULL"),
+                Self::EnumUnspecified => f.write_str("ENUM_UNSPECIFIED"),
             }
         }
     }
@@ -18354,6 +18523,7 @@ Format: `vaults/{vault_id}/wallets/{wallet_id}`*/
             match value {
                 "BASIC" => Ok(Self::Basic),
                 "FULL" => Ok(Self::Full),
+                "ENUM_UNSPECIFIED" => Ok(Self::EnumUnspecified),
                 _ => Err("invalid value".into()),
             }
         }

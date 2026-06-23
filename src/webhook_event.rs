@@ -341,6 +341,8 @@ impl From<crate::generated::types::V2TransactionStateEnum> for TransactionState 
             G::Dropped => Self::Dropped,
             G::Confirmed => Self::Confirmed,
             G::Expired => Self::Expired,
+            // Proto unspecified sentinel → the macro's forward-compat catch-all.
+            G::EnumUnspecified => Self::Unknown,
         }
     }
 }
@@ -352,6 +354,8 @@ impl From<crate::generated::types::V2AmlActionEnum> for AmlAction {
             G::Deny => Self::Deny,
             G::Allow => Self::Allow,
             G::Alert => Self::Alert,
+            // Proto unspecified sentinel → the macro's forward-compat catch-all.
+            G::EnumUnspecified => Self::Unknown,
         }
     }
 }
@@ -604,6 +608,8 @@ mod tests {
             (S::Dropped, TransactionState::Dropped),
             (S::Confirmed, TransactionState::Confirmed),
             (S::Expired, TransactionState::Expired),
+            // Proto unspecified sentinel maps to the forward-compat catch-all.
+            (S::EnumUnspecified, TransactionState::Unknown),
         ];
         for (gen, expected) in states {
             assert_eq!(TransactionState::from(gen), expected);
@@ -612,6 +618,7 @@ mod tests {
             (G::Deny, AmlAction::Deny),
             (G::Allow, AmlAction::Allow),
             (G::Alert, AmlAction::Alert),
+            (G::EnumUnspecified, AmlAction::Unknown),
         ];
         for (gen, expected) in actions {
             assert_eq!(AmlAction::from(gen), expected);

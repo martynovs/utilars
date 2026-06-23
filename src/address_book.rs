@@ -99,6 +99,8 @@ pub enum VaultActionStatus {
     Canceled,
     /// Expired before reaching quorum.
     Expired,
+    /// The API returned the proto unspecified sentinel (status not set).
+    Unspecified,
 }
 
 impl From<V2VaultActionStatusEnum> for VaultActionStatus {
@@ -112,6 +114,7 @@ impl From<V2VaultActionStatusEnum> for VaultActionStatus {
             V2VaultActionStatusEnum::Failed => Self::Failed,
             V2VaultActionStatusEnum::Canceled => Self::Canceled,
             V2VaultActionStatusEnum::Expired => Self::Expired,
+            V2VaultActionStatusEnum::EnumUnspecified => Self::Unspecified,
         }
     }
 }
@@ -409,5 +412,6 @@ mod tests {
         assert_eq!(S::from(E::Failed), S::Failed);
         assert_eq!(S::from(E::Canceled), S::Canceled);
         assert_eq!(S::from(E::Expired), S::Expired);
+        assert_eq!(S::from(E::EnumUnspecified), S::Unspecified);
     }
 }
