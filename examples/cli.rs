@@ -31,7 +31,8 @@
 //! # optional: export UTILA_BASE_URL='https://api.utila.io'
 //!
 //! cargo run --example utilars -- vaults
-//! cargo run --example utilars -- balances <vault-id>
+//! cargo run --example utilars -- balances <vault-id>              # whole vault
+//! cargo run --example utilars -- balances <vault-id> <wallet-id>  # one wallet
 //! cargo run --example utilars -- transfer <vault-id> \
 //!     --asset assets/native.ethereum-mainnet \
 //!     --from vaults/<v>/wallets/<w> --to 0xabc... --amount 1.5
@@ -105,8 +106,12 @@ enum Command {
         #[arg(long)]
         note: Option<String>,
     },
-    /// Query a vault's balances (asset metadata resolved + enriched).
-    Balances { vault: String },
+    /// Query balances (asset metadata resolved + enriched) — the whole vault, or one wallet.
+    Balances {
+        vault: String,
+        /// Restrict to one wallet (the id from `wallets`). Omit for the whole vault.
+        wallet: Option<String>,
+    },
     /// List a vault's recent transactions (one page).
     Transactions {
         vault: String,
@@ -491,8 +496,27 @@ async fn run(client: &UtilaClient, command: Command, json: bool) -> Result<()> {
             let address = builder.send().await?;
             emit_one(&wallet_address_json(address))?;
         }
-        Command::Balances { vault } => {
-            let balances = client.balances().query(VaultId::new(vault)).await?;
+        Command::Balances { vault, wallet } => {
+            let vault = VaultId::new(vault);
+            let balances = match wallet {
+                None => client.balances().query(vault).await?,
+                Some(wallet) => {
+                    let balances: Vec<_> = client
+                        .balances()
+                        .query_wallet_balances(vault, WalletId::new(wallet))
+                        .stream()
+                        .try_collect()
+                        .await?;
+                    balances
+                        .into_iter()
+                        .map(|b| Balance {
+                            asset: b.asset,
+                            amount: b.amount,
+                            frozen: b.frozen,
+                        })
+                        .collect()
+                }
+            };
             let items: Vec<Value> = balances.into_iter().map(balance_json).collect();
             emit_list(
                 json,
