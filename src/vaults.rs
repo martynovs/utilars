@@ -160,6 +160,7 @@ mod tests {
             archived: Some(true),
             create_time: Some(create_time),
             display_name: "Treasury".into(),
+            key_setup_mode: None,
             name: Some("vaults/abc".into()),
         });
         assert_eq!(full.name.to_string(), "vaults/abc");
@@ -172,6 +173,7 @@ mod tests {
             archived: None,
             create_time: None,
             display_name: String::new(),
+            key_setup_mode: None,
             name: None,
         });
         assert_eq!(bare.name.to_string(), "");

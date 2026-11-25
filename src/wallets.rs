@@ -566,10 +566,13 @@ impl CreateWalletBuilder<'_> {
             btc_details: None,
             converted_value: None,
             create_params: None,
+            create_time: None,
+            creator: None,
             display_name: self.display_name,
             evm_details: None,
             external: self.external,
             has_frozen_assets: None,
+            incomplete_value: None,
             name: None,
             networks: self
                 .networks
@@ -577,6 +580,7 @@ impl CreateWalletBuilder<'_> {
                 .map(NetworkRef::resource_name)
                 .collect(),
             solana_details: None,
+            stellar_details: None,
             ton_details: None,
             tron_details: None,
             xrpl_details: None,
@@ -620,6 +624,7 @@ impl CreateAddressBuilder<'_> {
     pub async fn send(self) -> Result<WalletAddress> {
         let body = V2WalletAddress {
             address: None,
+            create_params: None,
             display_name: self.display_name,
             format: None,
             key: None,

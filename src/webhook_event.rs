@@ -308,6 +308,7 @@ wire_enum! {
         Dropped => "DROPPED",
         Confirmed => "CONFIRMED",
         Expired => "EXPIRED",
+        AwaitingBundleApproval => "AWAITING_BUNDLE_APPROVAL",
     }
 }
 
@@ -341,6 +342,7 @@ impl From<crate::generated::types::V2TransactionStateEnum> for TransactionState 
             G::Dropped => Self::Dropped,
             G::Confirmed => Self::Confirmed,
             G::Expired => Self::Expired,
+            G::AwaitingBundleApproval => Self::AwaitingBundleApproval,
             // Proto unspecified sentinel → the macro's forward-compat catch-all.
             G::EnumUnspecified => Self::Unknown,
         }
@@ -558,6 +560,10 @@ mod tests {
             ("DROPPED", TransactionState::Dropped),
             ("CONFIRMED", TransactionState::Confirmed),
             ("EXPIRED", TransactionState::Expired),
+            (
+                "AWAITING_BUNDLE_APPROVAL",
+                TransactionState::AwaitingBundleApproval,
+            ),
         ];
         for (wire, expected) in states {
             assert_eq!(TransactionState::from(wire), expected, "{wire}");
@@ -608,6 +614,10 @@ mod tests {
             (S::Dropped, TransactionState::Dropped),
             (S::Confirmed, TransactionState::Confirmed),
             (S::Expired, TransactionState::Expired),
+            (
+                S::AwaitingBundleApproval,
+                TransactionState::AwaitingBundleApproval,
+            ),
             // Proto unspecified sentinel maps to the forward-compat catch-all.
             (S::EnumUnspecified, TransactionState::Unknown),
         ];

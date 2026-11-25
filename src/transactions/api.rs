@@ -757,6 +757,8 @@ impl InitiateBuilder<'_> {
             validate_only: self.validate_only.then_some(true),
             run_simulation: self.run_simulation.then_some(true),
             designated_signers: Vec::new(),
+            annotations: std::collections::HashMap::new(),
+            skip_initiator_approval: None,
             expire_time: None,
             include_referenced_resources: None,
         };

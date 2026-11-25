@@ -212,7 +212,7 @@ pub enum StellarMemoType {
     Return,
 }
 
-impl From<StellarMemoType> for g::Apiv2StellarTransactionMemoTypeEnum {
+impl From<StellarMemoType> for g::V2StellarTransactionMemoTypeEnum {
     fn from(t: StellarMemoType) -> Self {
         match t {
             StellarMemoType::Text => Self::Text,
@@ -223,9 +223,9 @@ impl From<StellarMemoType> for g::Apiv2StellarTransactionMemoTypeEnum {
     }
 }
 
-impl From<StellarMemo> for g::Apiv2StellarTransactionMemo {
+impl From<StellarMemo> for g::V2StellarTransactionMemo {
     fn from(m: StellarMemo) -> Self {
-        g::Apiv2StellarTransactionMemo {
+        g::V2StellarTransactionMemo {
             data: m.data,
             type_: m.memo_type.into(),
         }

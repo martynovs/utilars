@@ -27,6 +27,7 @@ impl From<EvmTransaction> for g::Apiv2EvmTransaction {
             network: t.network.as_str().to_string(),
             override_params: None,
             publish: t.publish,
+            sponsor: None,
             to_address: t.to,
             value: t.value,
         }

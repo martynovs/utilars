@@ -4,8 +4,8 @@
       "AddressBookBatchAddAddressBookEntriesToGroupBody": {
         "properties": {
           "addressBookEntryGroup": {
-            "description": "The resource name of the address book entry group that the entries should be\nadded to.\n\nFormat: `vaults/{vault_id}/addressBookEntryGroups/{group_id}`",
-            "example": "vaults/1b25635a5b3f/addressBookEntryGroups/abc123",
+            "description": "The resource name of the address book entry group that the entries should be\nadded to.\n\nFormat: `vaults/{vault_id}/policy/addressBookEntryGroups/{group_id}`. The\nlegacy `vaults/{vault_id}/addressBookEntryGroups/{group_id}` is also accepted.",
+            "example": "vaults/1b25635a5b3f/policy/addressBookEntryGroups/abc123",
             "type": "string"
           },
           "names": {
@@ -56,7 +56,7 @@
         "type": "object"
       },
       "AssetTokenInfoStandardEnum": {
-        "description": " - ERC20: ERC20 is the most common fungible token standard.\n - ERC721: ERC721 is the most common non-fungible token standard.\n - ERC1155: ERC1155 is a newer token standard that allows for multiple tokens to be\nheld in a single contract.\n - TRC20: TRC20 is the most common tron's fungible token standard.\n - SPL_TOKEN: SPL Token - solana's token standard.\n - SPL_TOKEN_2022: Token2020 - solana's new token extension for spl tokens.\n - ICS20: ICS20 cosmos's token standard.\n - JETTON: JETTON TON's token standard.\n - TIP20: TIP20 is the Tempo blockchain token standard (ERC-20 extension with compliance features).",
+        "description": " - ERC20: ERC20 is the most common fungible token standard.\n - ERC721: ERC721 is the most common non-fungible token standard.\n - ERC1155: ERC1155 is a newer token standard that allows for multiple tokens to be\nheld in a single contract.\n - TRC20: TRC20 is the most common tron's fungible token standard.\n - SPL_TOKEN: SPL Token - solana's token standard.\n - SPL_TOKEN_2022: Token2020 - solana's new token extension for spl tokens.\n - ICS20: ICS20 cosmos's token standard.\n - JETTON: JETTON TON's token standard.\n - TIP20: TIP20 is the Tempo blockchain token standard (ERC-20 extension with compliance features).\n - ERC7984: ERC7984 is the confidential token standard, where balances and transfer\namounts are encrypted on chain.",
         "enum": [
           "ERC20",
           "ERC721",
@@ -66,7 +66,8 @@
           "SPL_TOKEN_2022",
           "ICS20",
           "JETTON",
-          "TIP20"
+          "TIP20",
+          "ERC7984"
         ],
         "type": "string"
       },
@@ -75,7 +76,7 @@
           "memo": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/apiv2StellarTransactionMemo"
+                "$ref": "#/components/schemas/v2StellarTransactionMemo"
               }
             ],
             "description": "Optional typed memo for Stellar native and token transfers.\n\nWhen set, the type must be explicit (TEXT, ID, HASH, or RETURN).\nSee StellarTransaction.Memo for format and validation rules.\nIf not set for a Stellar transfer, no memo is attached."
@@ -93,6 +94,15 @@
         },
         "title": "Blockchain specific options for XRPL Asset Transfer",
         "type": "object"
+      },
+      "BTCDetailsAddressFormat": {
+        "description": "Address format for a Bitcoin-based network. Subset of\nWalletAddress.Format restricted to Bitcoin-based values.",
+        "enum": [
+          "P2PKH",
+          "P2WPKH",
+          "P2TR"
+        ],
+        "type": "string"
       },
       "BTCTransactionUTXOIn": {
         "properties": {
@@ -112,6 +122,10 @@
             "description": "The signing session which was used to sign the input. Available when the transaction has been prepared for signing / signed.\n\nDeprecated: Use request.signing_sessions instead.",
             "example": "vaults/2d2e40r3/signingSessions/132e40r3",
             "type": "string"
+          },
+          "userSelected": {
+            "description": "Whether this input was explicitly selected by the user.\nWhen false, the input was automatically chosen by the coin-selection algorithm.",
+            "type": "boolean"
           }
         },
         "type": "object"
@@ -129,8 +143,84 @@
           "amount": {
             "description": "Amount in asset unit (BTC).",
             "type": "string"
+          },
+          "change": {
+            "description": "True when this output is the change output.",
+            "type": "boolean"
+          },
+          "changeUserSelected": {
+            "description": "True when the change address was supplied by the user; false when auto-generated.\nOnly meaningful when `change` is true.",
+            "type": "boolean"
+          },
+          "vout": {
+            "description": "On-chain output index (vout) of this output within the transaction.\n\nTogether with the transaction's chain id, `txid:vout` is the stable,\ncanonical identifier of this output (matching QueryWalletUTXOs). Prefer it\nover the position of this output within `outputs`, which only reflects the\nvault-relevant outputs Utila retains and is not the on-chain index.\n\nSet once the transaction's on-chain identity is known — i.e. its transaction\nid is assigned: for outgoing transactions from the SIGNED state onward, and\nfor incoming deposits once observed on-chain. Omitted for pending,\npre-signing transactions.",
+            "format": "int32",
+            "type": "integer"
           }
         },
+        "type": "object"
+      },
+      "BTCTransferChangeOutput": {
+        "description": "Specifies where to send the source wallet's change.",
+        "properties": {
+          "address": {
+            "description": "The change address. Must belong to the source wallet.\n\nCan be one of the following:\n1. A raw string address (example: `bc1q3vfght7rln2c3733dl42navt8pslfya7talfns`)\n2. A wallet: `vaults/{vault_id}/wallets/{wallet_id}` (Utila will select an appropriate change address)\n3. A specific wallet address: `vaults/{vault_id}/wallets/{wallet_id}/addresses/{address_id}`",
+            "type": "string"
+          }
+        },
+        "required": [
+          "address"
+        ],
+        "type": "object"
+      },
+      "BTCTransferFeeSettings": {
+        "description": "Custom fee settings for the transaction.",
+        "properties": {
+          "feeRate": {
+            "description": "Fee rate in satoshi per virtual byte (sat/vB).\n\nExample: `10.5`.",
+            "example": "10.5",
+            "type": "string"
+          }
+        },
+        "required": [
+          "feeRate"
+        ],
+        "type": "object"
+      },
+      "BTCTransferInputSource": {
+        "description": "Specifies a source from which Utila may automatically select UTXOs.",
+        "properties": {
+          "source": {
+            "description": "The source to select UTXOs from.\n\nCan be one of the following:\n1. A raw string address (example: `bc1q3vfght7rln2c3733dl42navt8pslfya7talfns`)\n2. A wallet: `vaults/{vault_id}/wallets/{wallet_id}` (selects across all addresses)\n3. A specific wallet address: `vaults/{vault_id}/wallets/{wallet_id}/addresses/{address_id}`",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source"
+        ],
+        "type": "object"
+      },
+      "BTCTransferOutput": {
+        "description": "A single output destination.",
+        "properties": {
+          "amount": {
+            "description": "The amount to send, in decimal form.\n\nExample: `\"0.001\"` (0.001 BTC).",
+            "example": "0.001",
+            "type": "string"
+          },
+          "destination": {
+            "description": "The destination of the transfer.\n\nCan be one of the following:\n1. A raw string address (example: `bc1q3vfght7rln2c3733dl42navt8pslfya7talfns`)\n2. A wallet: `vaults/{vault_id}/wallets/{wallet_id}` (resolves to the wallet's main deposit address)\n3. A specific wallet address: `vaults/{vault_id}/wallets/{wallet_id}/addresses/{address_id}`",
+            "type": "string"
+          },
+          "payFeeFromAmount": {
+            "description": "If set to true, the transaction fee will be deducted from this output's amount.\n\nAt most one output may have this set to true. Cannot be combined with `fee_payer`.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "destination",
+          "amount"
+        ],
         "type": "object"
       },
       "BalancesQueryBalancesBody": {
@@ -294,6 +384,40 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "EVMUtilaDelegatedCallsCallRaw": {
+        "description": "Raw call data.",
+        "properties": {
+          "data": {
+            "description": "The calldata to send with the call.\n\nFormat: `0x{hex_data}`",
+            "type": "string"
+          },
+          "toAddress": {
+            "description": "The destination address of the call.\n\nFormat: `0x{address}`",
+            "type": "string"
+          },
+          "value": {
+            "description": "The value to send with the call in wei. Can be hex or decimal.\n\nExample: `0xde0b6b3a7640000` or `1000000000000000000` for 1 ETH.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "toAddress"
+        ],
+        "type": "object"
+      },
+      "GasStationsRefreshGasStationBalanceBody": {
+        "properties": {
+          "asset": {
+            "description": "The asset whose balance should be refreshed.",
+            "example": "assets/native.ethereum-mainnet",
+            "type": "string"
+          }
+        },
+        "required": [
+          "asset"
+        ],
         "type": "object"
       },
       "NetworkCAIPDetails": {
@@ -781,6 +905,10 @@
             "description": "The asset identifier for this transition (derived from program_id).",
             "type": "string"
           },
+          "function": {
+            "description": "e.g. \"transfer_private\", \"join\".",
+            "type": "string"
+          },
           "internal": {
             "description": "True for child transitions generated by internal program calls\n(e.g. credits.aleo/join called inside autojoin_credits_15_16.aleo/join_16).",
             "type": "boolean"
@@ -806,10 +934,6 @@
           },
           "transferPublicToPrivate": {
             "$ref": "#/components/schemas/TransactionTransferPublicToPrivate"
-          },
-          "transition": {
-            "description": "e.g. \"transfer_private\", \"join\".",
-            "type": "string"
           },
           "unknown": {
             "$ref": "#/components/schemas/TransactionUnknownOperation"
@@ -1237,6 +1361,10 @@
               }
             ],
             "description": "Transfer source address. Not populated for BTC transactions."
+          },
+          "unknownAmount": {
+            "description": "Whether the amount of this transfer is unknown to Utila.\n\nSet only for confidential token transfers whose encrypted amount could not\nbe decrypted. When true, `amount` is reported as `0`.",
+            "type": "boolean"
           }
         },
         "type": "object"
@@ -1387,6 +1515,13 @@
       },
       "TransactionsInitiateTransactionBody": {
         "properties": {
+          "annotations": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Arbitrary client-defined key/value metadata to attach to the transaction.\n\nUtila stores these values but never interprets them. They are surfaced\nread-only on the resulting Transaction to anyone who can view it (custodians,\npartners, integrations), so multiple integrations can namespace their own\nkeys without colliding.\n\nThis field is meant for small, lightweight metadata rather than bulk data:\n  * At most 64 entries.\n  * Keys: at most 256 characters.\n  * Total serialized size (UTF-8): at most 64 KiB (65,536 bytes).\n\nAvoid storing secrets or sensitive data here, since the data is visible to\nother parties who can view the transaction. For anything larger than the\nsize limit, consider keeping it in your own system and referencing it by an ID.",
+            "type": "object"
+          },
           "designatedSigners": {
             "description": "If the transaction is designated to be signed by a specific signer, this field should be set.\n\nFormat: `users/{email}` or `users/{id}`\n\nExample: `[\"users/name@example.com\"]` or `[\"users/a3e4f5\"]`",
             "example": [
@@ -1442,6 +1577,10 @@
             "description": "Run a simulation against a blockchain node to get the estimated execution results of the transaction like balance changes.",
             "type": "boolean"
           },
+          "skipInitiatorApproval": {
+            "description": "If set to true, the initiator's approval is not automatically recorded\nwhen the transaction requires approval by policy. The initiator may\nstill approve the transaction later.",
+            "type": "boolean"
+          },
           "validateOnly": {
             "description": "If set to true, the transaction will be validated but not created.",
             "type": "boolean"
@@ -1494,6 +1633,59 @@
         ],
         "type": "object"
       },
+      "TransactionsSetTransactionNoteBody": {
+        "properties": {
+          "includeReferencedResources": {
+            "description": "Include referenced resources in the response.",
+            "type": "boolean"
+          },
+          "note": {
+            "description": "The note to store on the transaction.\n\nVisible to all vault members. An empty string clears the note.\nThe note is limited to 600 characters.",
+            "example": "Invoice 1042",
+            "type": "string"
+          }
+        },
+        "required": [
+          "note"
+        ],
+        "type": "object"
+      },
+      "TransactionsSimulateTransactionBody": {
+        "properties": {
+          "details": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/v2InitiateTransactionRequestDetails"
+              }
+            ],
+            "description": "The transaction to simulate, in the same form accepted by InitiateTransaction.\n\nChoose one of the available messages.",
+            "example": {
+              "assetTransfer": {
+                "amount": "1.5",
+                "asset": "assets/native.ethereum-mainnet",
+                "destination": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "source": "vaults/1b25635a5b3f/wallets/95257c5a522f"
+              }
+            }
+          },
+          "includeReferencedResources": {
+            "description": "Include referenced resources in the response.",
+            "type": "boolean"
+          },
+          "priority": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/v2TransactionPriorityEnum"
+              }
+            ],
+            "description": "The fee priority to simulate with, which affects the fees the simulated transaction would pay."
+          }
+        },
+        "required": [
+          "details"
+        ],
+        "type": "object"
+      },
       "TransactionsVoteOnTransactionRequestBody": {
         "properties": {
           "vote": {
@@ -1531,34 +1723,36 @@
         },
         "type": "object"
       },
-      "WalletAddressFormat": {
-        "description": " - BITCOIN_P2PKH: Bitcoin P2PKH address format.\n - BITCOIN_P2WPKH: Bitcoin P2WPKH address format.\n - EVM: Ethereum address format.\n - TRON_BASE58: Tron base58 address format.\n - BASE58: Solana address format.\n - TON_NON_BOUNCEABLE: Ton address format.\n - SUBSTRATE_58: Substrate address format.\n - BITCOIN_P2TR: Bitcoin P2TR (Taproot, BIP-341) address format.",
+      "VerificationContextValidationEnum": {
         "enum": [
-          "BITCOIN_P2PKH",
-          "BITCOIN_P2WPKH",
-          "EVM",
-          "TRON_BASE58",
-          "BASE58",
-          "TON_NON_BOUNCEABLE",
-          "SUBSTRATE_58",
-          "BITCOIN_P2TR"
+          "UNKNOWN",
+          "VALID",
+          "INVALID"
         ],
         "type": "string"
       },
-      "WalletCreateParams": {
-        "description": "Parameters only used during wallet creation.",
+      "WalletCreateParamsBTCDetailsBTCNetworkDetails": {
+        "description": "Creation parameters for a single Bitcoin-based network in the wallet.",
         "properties": {
-          "walletGroups": {
-            "description": "Wallet will be assigned to these wallet groups upon creation.\nEach group must support assignment of empty wallets on creation in the dedicated group setting.\n\nFormat: `vaults/{vault_id}/walletGroups/{wallet_group_id}`.",
-            "example": [
-              "vaults/1b25635a5b3f/walletGroups/95257c5a522f"
+          "format": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BTCDetailsAddressFormat"
+              }
             ],
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
+            "description": "Address format for the new wallet on this network.\n\nPer-chain support:\n\n| Chain        | Supported    | Default |\n|--------------|--------------|---------|\n| Bitcoin      | P2WPKH, P2TR | P2WPKH  |\n| Litecoin     | P2WPKH       | P2WPKH  |\n| Dogecoin     | P2PKH        | P2PKH   |\n| Bitcoin Cash | P2PKH        | P2PKH   |\n| Pearl        | P2TR         | P2TR    |",
+            "example": "P2TR"
+          },
+          "network": {
+            "description": "The Bitcoin-based network. Must be one of the wallet's `networks`.\n\nFormat: `networks/{network_id}`",
+            "example": "networks/bitcoin-mainnet",
+            "type": "string"
           }
         },
+        "required": [
+          "network",
+          "format"
+        ],
         "type": "object"
       },
       "WalletSolanaDetails": {
@@ -1613,6 +1807,27 @@
         },
         "type": "object"
       },
+      "WalletconnectSessionVerificationContext": {
+        "properties": {
+          "origin": {
+            "description": "The verified origin of the WalletConnect request.",
+            "type": "string"
+          },
+          "validation": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VerificationContextValidationEnum"
+              }
+            ],
+            "description": "Whether the peer's verified origin is valid, invalid, or unknown."
+          },
+          "verifyUrl": {
+            "description": "The WalletConnect Verify server URL that produced the validation.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "WalletsArchiveWalletBody": {
         "properties": {
           "allowMissing": {
@@ -1660,6 +1875,28 @@
         ],
         "type": "object"
       },
+      "WalletsDeriveContextHashBody": {
+        "properties": {
+          "application": {
+            "description": "Application domain tag used for domain separation, e.g. \"babylon-btc-vault\".",
+            "type": "string"
+          },
+          "context": {
+            "description": "Application-supplied value that participates in domain separation.",
+            "type": "string"
+          },
+          "network": {
+            "description": "The network the derivation is bound to.\n\nFormat: `networks/{network_id}`",
+            "type": "string"
+          }
+        },
+        "required": [
+          "network",
+          "application",
+          "context"
+        ],
+        "type": "object"
+      },
       "WalletsUnarchiveWalletBody": {
         "properties": {
           "allowMissing": {
@@ -1700,11 +1937,36 @@
             "description": "If it's an address in the vault (e.g., a wallet address), a reference to address information will be listed here.\nAddress information can be fetched from `ReferencedAddressesInfo` map with the reference as the key.\n\nWill be populated only if `includeReferencedResources` is set to `true`.",
             "type": "string"
           },
+          "private": {
+            "description": "True when the address is redacted because it belongs to a private Aleo record.\nWhen set, `value` is empty.",
+            "readOnly": true,
+            "type": "boolean"
+          },
           "value": {
             "description": "The actual address.",
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "apiv2BTCPSBT": {
+        "description": "Sign an externally-created PSBT (Partially Signed Bitcoin Transaction).\n\nBy default Utila signs the PSBT and returns it without broadcasting.\nSet `publish` to true to have Utila automatically broadcast after signing.",
+        "properties": {
+          "network": {
+            "description": "The resource name of the network of the transaction.\n\nFormat: `networks/{network_id}`.",
+            "example": "networks/bitcoin-mainnet",
+            "type": "string"
+          },
+          "psbt": {
+            "description": "The PSBT data to sign, encoded in base64 format per BIP-174.",
+            "format": "byte",
+            "type": "string"
+          }
+        },
+        "required": [
+          "network",
+          "psbt"
+        ],
         "type": "object"
       },
       "apiv2EVMAccountDelegation": {
@@ -1714,7 +1976,7 @@
             "type": "string"
           },
           "contractAddress": {
-            "description": "The address of the contract the account is delegating to.",
+            "description": "The address of the contract the account is delegating to.\n\nDelegating to the zero address is equivalent to undelegating and is automatically\napproved.",
             "type": "string"
           },
           "fromAddress": {
@@ -1772,6 +2034,10 @@
           "publish": {
             "description": "Set to true if you wish for Utila to automatically broadcast the transaction after it is signed. If not provided, defaults to `true`.",
             "type": "boolean"
+          },
+          "sponsor": {
+            "description": "Optional sponsor wallet/address that will pay transaction fees.\n\nWhen set, the transaction is submitted as a sponsored EIP-7702 delegated execute call.\nThe network must support EIP-7702.\n\nCan be one of the following:\n1. A raw string address (example: `0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48`)\n2. A wallet: `vaults/{vault_id}/wallets/{wallet_id}`\n3. A specific wallet address: `vaults/{vault_id}/wallets/{wallet_id}/addresses/{address_id}`\n\nThe sponsor must be a Utila-managed wallet or address in the same vault with sufficient balance to pay transaction fees.",
+            "type": "string"
           },
           "toAddress": {
             "description": "The destination of the transfer.\n\nIf empty, the transaction is a contract deployment.\n\nCan be one of the following:\n1. A `0x`-prefixed hex string address (example: `0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48`)\n2. A wallet: `vaults/{vault_id}/wallets/{wallet_id}`.\n3. A specific wallet address: `vaults/{vault_id}/wallets/{wallet_id}/addresses/{address_id}`.",
@@ -1873,6 +2139,24 @@
         ],
         "type": "object"
       },
+      "apiv2SolanaSignMessage": {
+        "properties": {
+          "message": {
+            "description": "Example: `aGVsbG8=`. (representing `hello`)",
+            "format": "byte",
+            "title": "Message to sign, encoded in UTF-8 format. (Note: request will fail if the message is not UTF-8 encoded.)",
+            "type": "string"
+          },
+          "signer": {
+            "description": "The address to sign the message with.\n\nA Solana address, must be matched by a wallet address in the current vault (example: `Ab86991c6218b36c1d19D4a2e9EbMNqz9Ua2869RfYT`)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "signer"
+        ],
+        "type": "object"
+      },
       "apiv2StellarTimeBounds": {
         "properties": {
           "maxUnixTime": {
@@ -1901,7 +2185,7 @@
           "memo": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/apiv2StellarTransactionMemo"
+                "$ref": "#/components/schemas/v2StellarTransactionMemo"
               }
             ],
             "description": "Optional memo to attach to the transaction."
@@ -1942,36 +2226,25 @@
         ],
         "type": "object"
       },
-      "apiv2StellarTransactionMemo": {
+      "apiv2TronPersonalSign": {
         "properties": {
-          "data": {
-            "description": "The data of the memo. See documentation on enum values for the exact format.\n\nSee https://developers.stellar.org/docs/learn/fundamentals/transactions/operations-and-transactions#memo for more information.",
+          "fromAddress": {
+            "description": "The Tron address to sign the message with.\n\nThe message is hashed using the Tron `\\x19TRON Signed Message:\\n<length>` prefix\n(the Tron equivalent of EIP-191 personal_sign, as used by TronWeb's\n`signMessageV2`). To sign a message for a Tron address with the EIP-191\n`\\x19Ethereum Signed Message:\\n<length>` prefix instead, use `EVMPersonalSign`.\n\nCan be one of the following:\n1. A Tron `T`-prefixed base58 address, must be matched by a wallet address in the current vault (example: `TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t`)\n2. A wallet resource name: `vaults/{vault_id}/wallets/{wallet_id}`\n3. A specific wallet address resource name: `vaults/{vault_id}/wallets/{wallet_id}/addresses/{address_id}`",
             "type": "string"
           },
-          "type": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/apiv2StellarTransactionMemoTypeEnum"
-              }
-            ],
-            "description": "The type of the memo."
+          "message": {
+            "description": "A utf-8 encoded message to sign.\n\nOne of `message`, `messageHex` is required.\n\nExample: `hello`.",
+            "type": "string"
+          },
+          "messageHex": {
+            "description": "A utf-8 hex encoded message to sign, must start with `0x`.\n\nOne of `message`, `messageHex` is required.\n\nExample: `0x68656c6c6f` (representing `hello`)",
+            "type": "string"
           }
         },
         "required": [
-          "type",
-          "data"
+          "fromAddress"
         ],
         "type": "object"
-      },
-      "apiv2StellarTransactionMemoTypeEnum": {
-        "description": " - TEXT: A text memo. Limited to 28 bytes.\n - ID: A id memo. An unsigned 64-bit integer.\n - HASH: A hash memo. A hex string of the hash with a `0x` prefix.\n - RETURN: A return memo. A hex string of the return hash with a `0x` prefix.",
-        "enum": [
-          "TEXT",
-          "ID",
-          "HASH",
-          "RETURN"
-        ],
-        "type": "string"
       },
       "apiv2TronTransaction": {
         "properties": {
@@ -2466,6 +2739,11 @@
             "example": "This is my main trading wallet",
             "type": "string"
           },
+          "signed": {
+            "description": "Output only.\nWhether the address book entry is cryptographically signed after going through the quorum approval process.",
+            "readOnly": true,
+            "type": "boolean"
+          },
           "tracked": {
             "description": "If true, assets of this address should be tracked by Utila.",
             "type": "boolean"
@@ -2473,8 +2751,7 @@
         },
         "required": [
           "address",
-          "displayName",
-          "network"
+          "displayName"
         ],
         "type": "object"
       },
@@ -2547,6 +2824,14 @@
             "description": "The denom of the token on cosmos ecosystem.",
             "type": "string"
           },
+          "evmTokenDetails": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/v2EVMTokenDetails"
+              }
+            ],
+            "description": "EVM token details."
+          },
           "standard": {
             "allOf": [
               {
@@ -2587,7 +2872,7 @@
             "type": "string"
           },
           "memo": {
-            "description": "An optional \"on-chain\" memo to attach to the transfer.\n\nImplementation may differ between assets.\nCurrently supports:\n* TON native transfers (`assets/native.ton-mainnet`)\n* TON jetton transfers (`assets/jetton.ton-mainnet.EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs`)",
+            "description": "An optional \"on-chain\" memo to attach to the transfer.\n\nImplementation may differ between assets.\nCurrently supports:\n* TON native transfers (`assets/native.ton-mainnet`)\n* TON jetton transfers (`assets/jetton.ton-mainnet.EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs`)\n* Solana native transfers (`assets/native.solana-mainnet`)\n* Solana SPL token transfers (`assets/spl-token.solana-mainnet.*` and `assets/spl-token-2022.solana-mainnet.*`)\n  attached via the SPL Memo Program. Limited to 566 bytes of valid UTF-8.",
             "type": "string"
           },
           "payFeeFromAmount": {
@@ -2599,7 +2884,7 @@
             "type": "string"
           },
           "sponsor": {
-            "description": "Optional sponsor wallet/address that will pay transaction fees.\n\nCan be one of the following:\n1. A raw string address (example: `9B5XszUGdMaxCZ7uSQhPzdks5ZQSmWxrmzCSvtJ6Ns6g`)\n2. A wallet: `vaults/{vault_id}/wallets/{wallet_id}`\n3. A specific wallet address: `vaults/{vault_id}/wallets/{wallet_id}/addresses/{address_id}`\n4. A gas station: `vaults/{vault_id}/gasStations/{gas_station_id}`\n\nThe sponsor must be a Utila-managed wallet with sufficient balance to pay transaction fees.",
+            "description": "Optional sponsor that will pay transaction fees.\n\nCan be one of the following:\n1. A raw string address (example: `9B5XszUGdMaxCZ7uSQhPzdks5ZQSmWxrmzCSvtJ6Ns6g`)\n2. A wallet: `vaults/{vault_id}/wallets/{wallet_id}`\n3. A specific wallet address: `vaults/{vault_id}/wallets/{wallet_id}/addresses/{address_id}`\n4. A gas station: `vaults/{vault_id}/gasStations/{gas_station_id}` (TVM transfers only)\n\nSponsor requirements by blockchain:\n\n* TVM: a gas station in the same vault.\n* Bitcoin and other UTXO blockchains: a wallet in the same vault. A raw address or a specific wallet address is rejected.\n* Other blockchains: a Utila-managed wallet or address in the same vault with sufficient balance to pay transaction fees.",
             "type": "string"
           },
           "stellarOptions": {
@@ -2635,6 +2920,82 @@
         ],
         "type": "string"
       },
+      "v2BTCTransfer": {
+        "description": "A transfer transaction for Bitcoin and other UTXO-based networks with explicit input control.",
+        "properties": {
+          "changeOutputs": {
+            "description": "Change address override for the source wallet. At most one.\n\nWhen change is needed, Utila will use the specified address instead of auto-generating one.\nThe fee payer's change address is chosen by Utila.",
+            "items": {
+              "$ref": "#/components/schemas/BTCTransferChangeOutput"
+            },
+            "type": "array"
+          },
+          "feePayer": {
+            "description": "Optional wallet that pays the network fee.\n\nFormat: `vaults/{vault_id}/wallets/{wallet_id}`. Must be in the same vault as the\nsource wallet and differ from it. A raw address or a wallet-address resource is\nrejected.\n\nThe fee payer's UTXOs cover only the fee:\n\n* The source wallet still covers the full output amount and keeps its own change.\n* Any `inputs` owned by the fee payer are always spent toward the fee, and Utila\n  selects more fee payer UTXOs only if those fall short.\n* Whatever the fee payer's inputs exceed the fee returns to the fee payer as change, to\n  an address Utila picks. `change_outputs` cannot target the fee payer.\n\nCannot be combined with `pay_fee_from_amount`.",
+            "type": "string"
+          },
+          "feeSettings": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BTCTransferFeeSettings"
+              }
+            ],
+            "description": "Custom fee settings. Takes precedence over the parent request's `priority` field.\n\nIf neither is set, Utila uses a default priority (NORMAL)."
+          },
+          "inputSources": {
+            "description": "Sources from which Utila may automatically select additional UTXOs.\n\nOnly a single source is supported, and it sets the source wallet. The fee payer\nis set through `fee_payer`, never here.",
+            "items": {
+              "$ref": "#/components/schemas/BTCTransferInputSource"
+            },
+            "type": "array"
+          },
+          "inputs": {
+            "description": "Inputs used to fund the transaction.\n\nYou must provide at least one funding source:\n\n1. `inputs` – explicitly specified UTXOs.\n2. `input_sources` – sources from which Utila may automatically\n   select UTXOs.\n\nBoth may be provided. In that case, the specified `inputs` are always\nincluded and Utila will automatically select additional UTXOs from\n`input_sources` if needed to cover the outputs and fees.\n\nEvery UTXO listed here must belong to one of:\n\n* The source wallet: the wallet whose funds are transferred. It is set by\n  `input_sources`, or implied by the owner of `inputs`.\n* The fee payer, when `fee_payer` is set. These UTXOs go toward the fee only.",
+            "items": {
+              "$ref": "#/components/schemas/v2BTCTransferUTXO"
+            },
+            "type": "array"
+          },
+          "network": {
+            "description": "The resource name of the network of the transaction.\n\nFormat: `networks/{network_id}`.",
+            "example": "networks/bitcoin-mainnet",
+            "type": "string"
+          },
+          "outputs": {
+            "description": "The transfer outputs.",
+            "items": {
+              "$ref": "#/components/schemas/BTCTransferOutput"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "network",
+          "outputs"
+        ],
+        "type": "object"
+      },
+      "v2BTCTransferUTXO": {
+        "description": "A specific UTXO to use as an input.",
+        "properties": {
+          "txHash": {
+            "description": "The hash of the transaction that created this UTXO.",
+            "example": "4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b",
+            "type": "string"
+          },
+          "vout": {
+            "description": "The output index in the transaction.\n",
+            "example": 0,
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "txHash",
+          "vout"
+        ],
+        "type": "object"
+      },
       "v2Balance": {
         "properties": {
           "asset": {
@@ -2645,6 +3006,10 @@
           "frozenValue": {
             "example": "0.3",
             "type": "string"
+          },
+          "incompleteValue": {
+            "description": "Whether `value` omits confidential balances that could not be read.\n\nWhen true, `value` is a lower bound: the unreadable amounts count as zero.\n`unknown_value` on the per-wallet balances identifies which ones.",
+            "type": "boolean"
           },
           "rawValue": {
             "description": "The raw amount of the asset that this balance contains.\n\nSpecified in the smallest unit of the Asset.",
@@ -2685,6 +3050,10 @@
               }
             ],
             "description": "The current price of the asset."
+          },
+          "unknownAmount": {
+            "description": "Whether the amount of this balance change is unknown to Utila.\n\nSet only for confidential token transfers whose encrypted amount could not\nbe decrypted. When true, `amount` and `amount_abs` are reported as `0`;\n`negative` still reports the direction.",
+            "type": "boolean"
           }
         },
         "type": "object"
@@ -2706,7 +3075,7 @@
       "v2BatchAssetTransfer": {
         "properties": {
           "asset": {
-            "description": "The asset to transfer.\n\nCan be one of the following:\n1. A raw asset name `assets/{asset_id}` (example: `assets/e72ff35a5b15`)\n2. A native asset name `assets/native.{network_id}` (example: `assets/native.ethereum-mainnet`)\n3. An ERC20 asset name `assets/erc20.{network_id}.{contract}` (example: `assets/erc20.ethereum-mainnet.0x6b175474e89094c44da98b954eedeac495271d0f`)\n\nSupported Assets: The native currency of the network and ERC20 tokens.\n\n **Note: ERC20 asset transfers require an approval. See [GetLatestBatchContract](#tag/Blockchains/operation/Blockchains_GetLatestBatchContract) for more information.**\n\n\nSupported Networks: Ethereum and Polygon (Sepolia and Mumbai)",
+            "description": "The asset to transfer.\n\nCan be one of the following:\n1. A raw asset name `assets/{asset_id}` (example: `assets/e72ff35a5b15`)\n2. A native asset name `assets/native.{network_id}` (example: `assets/native.ethereum-mainnet`)\n3. An ERC20 asset name `assets/erc20.{network_id}.{contract}` (example: `assets/erc20.ethereum-mainnet.0x6b175474e89094c44da98b954eedeac495271d0f`)\n\nSupported Assets: The native currency of the network and ERC20 tokens.\n\n **Note: For the legacy batch-contract path (no `sponsor`), ERC20 asset transfers\n require an approval. See [GetLatestBatchContract](#tag/Blockchains/operation/Blockchains_GetLatestBatchContract)\n for more information. When `sponsor` is set on EVM, transfers use EIP-7702 sponsored\n multi-call and do not require batch-contract approval.**\n\n\nSupported Networks: Ethereum and Polygon (Sepolia and Mumbai)",
             "example": "assets/native.ethereum-mainnet",
             "type": "string"
           },
@@ -2864,9 +3233,20 @@
           "instrumentId": {
             "description": "The instrument ID.",
             "type": "string"
+          },
+          "supportsTransferPreapproval": {
+            "description": "Whether Utila supports creating a standing transfer pre-approval for this asset.",
+            "type": "boolean"
           }
         },
         "type": "object"
+      },
+      "v2ConfidentialTokenProviderEnum": {
+        "description": "The operator of the off-chain FHE infrastructure a confidential token\ndepends on.",
+        "enum": [
+          "ZAMA"
+        ],
+        "type": "string"
       },
       "v2ConvertedValue": {
         "description": "A message representing a converted value.",
@@ -2910,8 +3290,7 @@
         },
         "required": [
           "address",
-          "displayName",
-          "network"
+          "displayName"
         ],
         "type": "object"
       },
@@ -2969,6 +3348,44 @@
         },
         "type": "object"
       },
+      "v2DeriveContextHashResponse": {
+        "properties": {
+          "contextHash": {
+            "description": "The derived 32-byte value.",
+            "format": "byte",
+            "readOnly": true,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2ERC7984ConfidentialTokenPair": {
+        "description": "A confidential token and the public token it wraps.\n\nBoth sides are on `network`. Their decimals may differ, so read each side's\nown asset rather than deriving one from the other.",
+        "properties": {
+          "confidentialToken": {
+            "description": "The resource name of the confidential side of the pair.\n\nFormat: `assets/erc7984.{network_id}.{contract}`",
+            "type": "string"
+          },
+          "network": {
+            "description": "The resource name of the network.\n\nFormat: `networks/{network_id}`",
+            "example": "networks/ethereum-mainnet",
+            "type": "string"
+          },
+          "provider": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/v2ConfidentialTokenProviderEnum"
+              }
+            ],
+            "description": "The provider of the off-chain FHE infrastructure `confidential_token`\ndepends on."
+          },
+          "publicToken": {
+            "description": "The resource name of the public token that `confidential_token` wraps.\n\nFormat: `assets/erc20.{network_id}.{contract}`",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "v2EVMFeeEstimation": {
         "properties": {
           "gasPrice": {
@@ -2985,7 +3402,7 @@
       "v2EVMPersonalSign": {
         "properties": {
           "fromAddress": {
-            "description": "The address to sign the message with.\n\nCan be one of the following:\n1. A `0x`-prefixed hex string address, must be matched by a wallet address in the current vault (example: `0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48`)\n2. A wallet resource name: `vaults/{vault_id}/wallets/{wallet_id}`\n3. A specific wallet address resource name: `vaults/{vault_id}/wallets/{wallet_id}/addresses/{address_id}`",
+            "description": "The address to sign the message with.\n\nThe message is hashed using the EIP-191 `\\x19Ethereum Signed Message:\\n<length>` prefix.\nThis template also works on Tron networks: pass a Tron wallet address (or a\nwallet/address resource name that resolves to a Tron address) to produce an\nEIP-191 signature for that Tron address. Use `TronPersonalSign` instead when\nyou need the Tron-native `\\x19TRON Signed Message:\\n<length>` prefix.\n\nCan be one of the following:\n1. A `0x`-prefixed hex string address, must be matched by a wallet address in the current vault (example: `0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48`)\n2. A Tron `T`-prefixed base58 address, must be matched by a wallet address in the current vault (example: `TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t`)\n3. A wallet resource name: `vaults/{vault_id}/wallets/{wallet_id}`\n4. A specific wallet address resource name: `vaults/{vault_id}/wallets/{wallet_id}/addresses/{address_id}`",
             "type": "string"
           },
           "message": {
@@ -3041,6 +3458,46 @@
         ],
         "type": "object"
       },
+      "v2EVMSubmissionDetails": {
+        "description": "EVMSubmissionDetails describes an EVM submission: the set of transactions\nthat are broadcast together as a single gas-abstracted (sponsored) submission,\nsuch as an EIP-7702 authorization together with the user-operation\ntransactions it authorizes.",
+        "properties": {
+          "authorizationTransactions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "The authorization transactions (EIP-7702).\nResource names in the format: `vaults/{vault}/transactions/{transaction}`",
+            "type": "array"
+          },
+          "lastSubmittingTransaction": {
+            "title": "The most recent submitting transaction that sponsors this submission.\nResource name in the format: `vaults/{vault}/transactions/{transaction}`",
+            "type": "string"
+          },
+          "name": {
+            "description": "The resource name of the evm submission details.\n\nFormat: `vaults/{vault_id}/evmSubmissionDetails/{submission_id}`",
+            "type": "string"
+          },
+          "userOpTransactions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "The user operation transactions that are part of this submission bundle.\nThese are the actual transactions signed by the user (e.g., delegations, execute calls)\nthat will be submitted together as a sponsored transaction batch.\nResource names in the format: `vaults/{vault}/transactions/{transaction}`",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "v2EVMTokenDetails": {
+        "properties": {
+          "zamaConfidentialTokenPair": {
+            "description": "The other side of this token's Zama confidential (ERC-7984) pair.\n\nFormat: `assets/erc7984.{network_id}.{contract}` or `assets/erc20.{network_id}.{contract}`",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "v2EVMTransactionGas": {
         "properties": {
           "gasLimit": {
@@ -3084,6 +3541,105 @@
         },
         "type": "object"
       },
+      "v2EVMUtilaDelegatedCalls": {
+        "description": "EVM Utila delegated calls transaction using EIP-7702.\nAllows executing multiple calls from a delegated account with a sponsor paying gas fees.",
+        "properties": {
+          "calls": {
+            "description": "The calls to execute.\nRequired when creating a new submission.",
+            "items": {
+              "$ref": "#/components/schemas/v2EVMUtilaDelegatedCallsCall"
+            },
+            "type": "array"
+          },
+          "deadlineUnix": {
+            "description": "The deadline as unix timestamp in seconds. If not provided, there will be no deadline.\n\nFormat: \"1734854400\" (unix timestamp in seconds)",
+            "type": "string"
+          },
+          "fromAddress": {
+            "description": "The address of the sender account (the delegated account).\nRequired when creating a new submission.\n\nFormat: `0x{address}`",
+            "type": "string"
+          },
+          "network": {
+            "description": "The resource name of the network.\nRequired when creating a new submission.\n\nFormat: `networks/{network_id}`.",
+            "example": "networks/ethereum-mainnet",
+            "type": "string"
+          },
+          "submissionDetails": {
+            "$ref": "#/components/schemas/v2EVMUtilaDelegatedCallsSubmissionDetails"
+          }
+        },
+        "type": "object"
+      },
+      "v2EVMUtilaDelegatedCallsCall": {
+        "description": "A single call to execute.",
+        "properties": {
+          "raw": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EVMUtilaDelegatedCallsCallRaw"
+              }
+            ],
+            "description": "The raw call to make."
+          }
+        },
+        "required": [
+          "raw"
+        ],
+        "type": "object"
+      },
+      "v2EVMUtilaDelegatedCallsSubmissionDetails": {
+        "description": "Submission details for sponsored transaction.",
+        "properties": {
+          "sponsorAddress": {
+            "description": "The address of the sponsor who will pay gas fees.\n\nFormat: `0x{address}`",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2EVMZamaConfidentialActivatedToken": {
+        "description": "A confidential token (ERC-7984) a wallet is activated for, and when that\nactivation expires.",
+        "properties": {
+          "confidentialToken": {
+            "description": "The resource name of the confidential token.\n\nFormat: `assets/erc7984.{network_id}.{contract}`",
+            "readOnly": true,
+            "type": "string"
+          },
+          "expireTime": {
+            "description": "When the activation for this token expires.\n\nAbsent while the activation is still being processed.",
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2EVMZamaConfidentialActivation": {
+        "description": "An activation of a wallet for Zama confidential (ERC-7984) tokens.\n\nAlso renews an existing activation. Every call issues fresh credentials.",
+        "properties": {
+          "confidentialTokens": {
+            "description": "The confidential tokens to activate the wallet for. All must be on\n`network`.\n\nAt least one is required. Activating many tokens at once may require more\nthan one signature.\n\nFormat: `assets/erc7984.{network_id}.{contract}`",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "network": {
+            "description": "The resource name of the network to activate on.\n\nFormat: `networks/{network_id}`",
+            "type": "string"
+          },
+          "wallet": {
+            "description": "The resource name of the wallet to activate.\n\nFormat: `vaults/{vault_id}/wallets/{wallet_id}`",
+            "type": "string"
+          }
+        },
+        "required": [
+          "wallet",
+          "network",
+          "confidentialTokens"
+        ],
+        "type": "object"
+      },
       "v2EstimateTransactionFeeRequestDetails": {
         "properties": {
           "assetBatchTransfer": {
@@ -3102,6 +3658,14 @@
             ],
             "description": "An abstract transfer."
           },
+          "btcTransfer": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/v2BTCTransfer"
+              }
+            ],
+            "description": "A transfer for Bitcoin and similar UTXO-based blockchains, with explicit input control."
+          },
           "evmTransaction": {
             "allOf": [
               {
@@ -3109,6 +3673,14 @@
               }
             ],
             "description": "An EVM transaction."
+          },
+          "evmUtilaDelegatedCalls": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/v2EVMUtilaDelegatedCalls"
+              }
+            ],
+            "description": "An EVM Utila delegated calls transaction."
           },
           "tronTransaction": {
             "allOf": [
@@ -3157,6 +3729,147 @@
         },
         "type": "object"
       },
+      "v2GasStation": {
+        "properties": {
+          "alertThreshold": {
+            "description": "The alert threshold of the gas station.\nThis is the amount of the balance asset that will trigger an alert.\nIf not set, there won't be any alert triggered.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "balance": {
+            "description": "The balance of the gas station.",
+            "readOnly": true,
+            "type": "string"
+          },
+          "balanceAsset": {
+            "description": "The balance and alert threshold asset of the gas station.",
+            "example": "assets/native.ethereum-mainnet",
+            "readOnly": true,
+            "type": "string"
+          },
+          "depositAddresses": {
+            "description": "The deposit addresses of the gas station.",
+            "items": {
+              "$ref": "#/components/schemas/v2GasStationDepositAddress"
+            },
+            "readOnly": true,
+            "type": "array"
+          },
+          "name": {
+            "description": "The resource name of the gas station.\n\nFormat: `vaults/{vault_id}/gasStations/{gas_station_id}`",
+            "example": "vaults/1b2563/gasStations/a4b3df",
+            "readOnly": true,
+            "type": "string"
+          },
+          "network": {
+            "description": "The resource name of the network of the gas station.\n\nFormat: `networks/{network_id}`",
+            "example": "networks/tron-mainnet",
+            "type": "string"
+          },
+          "provider": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/v2GasStationProviderEnum"
+              }
+            ],
+            "description": "The provider of the gas station.",
+            "example": "TRONEX"
+          }
+        },
+        "required": [
+          "network",
+          "provider"
+        ],
+        "type": "object"
+      },
+      "v2GasStationDepositAddress": {
+        "properties": {
+          "depositAddress": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/apiv2Address"
+              }
+            ],
+            "description": "The deposit address of the gas station.",
+            "readOnly": true
+          },
+          "depositAddressDeprecated": {
+            "description": "The deposit address of the gas station. Deprecated: use `deposit_address` instead.",
+            "readOnly": true,
+            "type": "string"
+          },
+          "supportedAssets": {
+            "description": "The supported assets of the gas station deposit address.\nThese are the assets that this address accepts.",
+            "example": "assets/native.ethereum-mainnet",
+            "items": {
+              "type": "string"
+            },
+            "readOnly": true,
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "v2GasStationOrder": {
+        "properties": {
+          "asset": {
+            "description": "The asset the price is denominated in.\n\nFormat: `assets/{asset}`",
+            "example": "assets/native.tron-mainnet",
+            "readOnly": true,
+            "type": "string"
+          },
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/googlerpcStatus"
+              }
+            ],
+            "description": "The error of the gas station order.\nThis is only set if the order has failed.",
+            "readOnly": true
+          },
+          "gasStation": {
+            "description": "The gas station of the gas station order.",
+            "example": "vaults/1b2563/gasStations/a4b3df",
+            "readOnly": true,
+            "type": "string"
+          },
+          "name": {
+            "description": "The resource name of the gas station order.\n\nFormat: `vaults/{vault_id}/gasStations/{gas_station_id}/orders/{order_id}`",
+            "example": "vaults/1b2563/gasStations/a4b3df/orders/123456",
+            "readOnly": true,
+            "type": "string"
+          },
+          "price": {
+            "description": "The price paid for the order, as a decimal string in `asset` units.",
+            "readOnly": true,
+            "type": "string"
+          },
+          "state": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/v2GasStationOrderStateEnum"
+              }
+            ],
+            "description": "The state of the gas station order.",
+            "readOnly": true
+          }
+        },
+        "type": "object"
+      },
+      "v2GasStationOrderStateEnum": {
+        "enum": [
+          "PENDING",
+          "SUCCESS",
+          "FAILED"
+        ],
+        "type": "string"
+      },
+      "v2GasStationProviderEnum": {
+        "enum": [
+          "TRONEX"
+        ],
+        "type": "string"
+      },
       "v2GetAssetResponse": {
         "properties": {
           "asset": {
@@ -3166,6 +3879,55 @@
               }
             ],
             "description": "The asset returned."
+          }
+        },
+        "type": "object"
+      },
+      "v2GetEVMSubmissionDetailsResponse": {
+        "properties": {
+          "evmSubmissionDetails": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/v2EVMSubmissionDetails"
+              }
+            ],
+            "description": "The evm submission details."
+          }
+        },
+        "type": "object"
+      },
+      "v2GetEVMZamaConfidentialActivationResponse": {
+        "properties": {
+          "activatedTokens": {
+            "description": "The confidential tokens the wallet is activated for on the requested\nnetwork, and those whose activation is still being processed.\n\nTokens whose activation has expired are not listed.",
+            "items": {
+              "$ref": "#/components/schemas/v2EVMZamaConfidentialActivatedToken"
+            },
+            "readOnly": true,
+            "type": "array"
+          },
+          "pendingTransactions": {
+            "description": "The transactions that are currently activating this wallet on the\nrequested network.\n\nA single transaction can activate several tokens.\n\nFormat: `vaults/{vault_id}/transactions/{transaction_id}`",
+            "items": {
+              "type": "string"
+            },
+            "readOnly": true,
+            "type": "array"
+          },
+          "referencedResources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/v2ReferencedResource"
+            },
+            "description": "A mapping of the referenced resources in the message.\nThe key is the resource name and the value is the corresponding resource.",
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "v2GetGasStationOrderResponse": {
+        "properties": {
+          "order": {
+            "$ref": "#/components/schemas/v2GasStationOrder"
           }
         },
         "type": "object"
@@ -3305,6 +4067,22 @@
             ],
             "description": "An abstract transfer."
           },
+          "btcPsbt": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/apiv2BTCPSBT"
+              }
+            ],
+            "description": "An externally-created PSBT to sign."
+          },
+          "btcTransfer": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/v2BTCTransfer"
+              }
+            ],
+            "description": "A transfer for Bitcoin and similar UTXO-based blockchains, with explicit input control."
+          },
           "evmAccountDelegation": {
             "allOf": [
               {
@@ -3337,6 +4115,22 @@
             ],
             "description": "An EVM transaction."
           },
+          "evmUtilaDelegatedCalls": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/v2EVMUtilaDelegatedCalls"
+              }
+            ],
+            "description": "An EVM Utila delegated calls transaction."
+          },
+          "evmZamaConfidentialActivation": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/v2EVMZamaConfidentialActivation"
+              }
+            ],
+            "description": "An activation of a wallet for Zama confidential (ERC-7984) tokens."
+          },
           "exchangeWithdrawal": {
             "allOf": [
               {
@@ -3352,6 +4146,14 @@
               }
             ],
             "description": "A serialized Solana transaction."
+          },
+          "solanaSignMessage": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/apiv2SolanaSignMessage"
+              }
+            ],
+            "description": "A Solana signMessage request."
           },
           "stellarRawTransaction": {
             "allOf": [
@@ -3376,6 +4178,14 @@
               }
             ],
             "description": "An Sui raw transaction."
+          },
+          "tronPersonalSign": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/apiv2TronPersonalSign"
+              }
+            ],
+            "description": "A Tron personal sign message."
           },
           "tronTransaction": {
             "allOf": [
@@ -3431,6 +4241,85 @@
         },
         "type": "object"
       },
+      "v2KeySetupModeEnum": {
+        "description": " - STANDARD: Native Utila MPC vault (default when unspecified on create).\n - DIRECT_IMPORT_FROM_FIREBLOCKS: Direct Fireblocks recovery-kit import (keypair generated at create).\n - HSM: HSM-custody vault: wallet keys are registered from HSM public\nmaterial, never generated.",
+        "enum": [
+          "STANDARD",
+          "DIRECT_IMPORT_FROM_FIREBLOCKS",
+          "HSM"
+        ],
+        "type": "string"
+      },
+      "v2LinkAddress": {
+        "properties": {
+          "address": {
+            "readOnly": true,
+            "title": "Blockchain address for this destination",
+            "type": "string"
+          },
+          "archiveTime": {
+            "format": "date-time",
+            "readOnly": true,
+            "title": "Time when this destination was archived",
+            "type": "string"
+          },
+          "connectionDisplayName": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "connectionId": {
+            "readOnly": true,
+            "title": "Connection ID for this destination",
+            "type": "string"
+          },
+          "createTime": {
+            "format": "date-time",
+            "readOnly": true,
+            "title": "Time when this destination was created",
+            "type": "string"
+          },
+          "name": {
+            "description": "The resource name of the Link connection.\n\nFormat: `vaults/{vault}/linkConnections/{link_connection}/addresses/{link_address}`",
+            "readOnly": true,
+            "type": "string"
+          },
+          "network": {
+            "readOnly": true,
+            "title": "Blockchain network for this destination",
+            "type": "string"
+          },
+          "signature": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/v2SignedData"
+              }
+            ],
+            "readOnly": true,
+            "title": "Signature of the destination"
+          },
+          "targetProfileDisplayName": {
+            "readOnly": true,
+            "type": "string"
+          },
+          "updateTime": {
+            "format": "date-time",
+            "readOnly": true,
+            "title": "Time when this destination was last updated",
+            "type": "string"
+          },
+          "verificationStatus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/v2VerificationStatusEnum"
+              }
+            ],
+            "readOnly": true,
+            "title": "Verification status of this destination"
+          }
+        },
+        "title": "A link address within a Link connection",
+        "type": "object"
+      },
       "v2ListAddressBookEntriesResponse": {
         "properties": {
           "addressBookEntries": {
@@ -3453,6 +4342,51 @@
             "format": "int32",
             "readOnly": true,
             "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "v2ListERC7984ConfidentialTokensResponse": {
+        "properties": {
+          "confidentialTokens": {
+            "description": "The confidential tokens supported on the network.",
+            "items": {
+              "$ref": "#/components/schemas/v2ERC7984ConfidentialTokenPair"
+            },
+            "readOnly": true,
+            "type": "array"
+          },
+          "referencedResources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/v2ReferencedResource"
+            },
+            "description": "A mapping of the referenced resources in the message.\nThe key is the resource name and the value is the corresponding resource.",
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "v2ListGasStationsResponse": {
+        "properties": {
+          "gasStations": {
+            "items": {
+              "$ref": "#/components/schemas/v2GasStation"
+            },
+            "type": "array"
+          },
+          "referencedAddressesInfo": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/v2NetworkAddressInfo"
+            },
+            "description": "A mapping of the addresses information in the message.\nThe key is the address information reference and the value is the corresponding address information.",
+            "type": "object"
+          },
+          "referencedResources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/v2ReferencedResource"
+            },
+            "description": "A mapping of the referenced resources in the message.\nThe key is the resource name and the value is the corresponding resource.",
+            "type": "object"
           }
         },
         "type": "object"
@@ -3638,6 +4572,10 @@
             "title": "If the address is listed in the vault address book, the resource name of the address book entry will be listed here",
             "type": "string"
           },
+          "linkAddress": {
+            "title": "If the address is a link address, the resource name of the link address will be listed here",
+            "type": "string"
+          },
           "wallet": {
             "description": "If the address is a wallet address, the resource name of its wallet will be listed here.\n\nFormat: `vaults/{vault_id}/wallets/{wallet_id}`",
             "example": "vaults/1b2563/wallets/95257",
@@ -3797,6 +4735,14 @@
             ],
             "description": "The asset resource."
           },
+          "linkAddress": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/v2LinkAddress"
+              }
+            ],
+            "description": "The link address resource."
+          },
           "transaction": {
             "allOf": [
               {
@@ -3855,6 +4801,29 @@
         },
         "type": "object"
       },
+      "v2RefreshGasStationBalanceResponse": {
+        "properties": {
+          "balance": {
+            "description": "The refreshed gas station balance.",
+            "readOnly": true,
+            "type": "string"
+          },
+          "balanceAsset": {
+            "description": "The asset of the refreshed balance.",
+            "example": "assets/native.ethereum-mainnet",
+            "readOnly": true,
+            "type": "string"
+          },
+          "referencedResources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/v2ReferencedResource"
+            },
+            "description": "A mapping of the referenced resources in the message.\nThe key is the resource name and the value is the corresponding resource.",
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
       "v2ReplaceTransactionResponse": {
         "properties": {
           "referencedAddressesInfo": {
@@ -3882,6 +4851,21 @@
         },
         "type": "object"
       },
+      "v2RequestSignature": {
+        "description": "RequestSignature is a signed API request.\n\nThe JWT typ is \"utila-req-sig+jwt\". Method, content type, and body hash are claims\ninside jwt. kid is the signing key's fingerprint (a service-account key for this\nrelease). Verifiers check jwt against raw_request_body and ignore every other field.",
+        "properties": {
+          "jwt": {
+            "description": "The compact request-signature JWT, verbatim.",
+            "type": "string"
+          },
+          "rawRequestBody": {
+            "description": "The exact request bytes the client sent.",
+            "format": "byte",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "v2ScreeningStateEnum": {
         "description": "The state of the AML report.\n\n - SKIPPED: No AML report was requested for the transaction.\n - PENDING: The AML report is still being processed by the provider.\n - FAILED: The AML report was not generated due to an error.\n - READY: The AML report was successfully generated.",
         "enum": [
@@ -3891,6 +4875,99 @@
           "READY"
         ],
         "type": "string"
+      },
+      "v2SetTransactionNoteResponse": {
+        "properties": {
+          "referencedAddressesInfo": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/v2NetworkAddressInfo"
+            },
+            "description": "A mapping of the referenced addresses in the message.\nThe key is the address and the value is the corresponding address info.",
+            "type": "object"
+          },
+          "referencedResources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/v2ReferencedResource"
+            },
+            "description": "A mapping of the referenced resources in the message.\nThe key is the resource name and the value is the corresponding resource.",
+            "type": "object"
+          },
+          "transaction": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/v2Transaction"
+              }
+            ],
+            "description": "The transaction after the note is saved."
+          }
+        },
+        "type": "object"
+      },
+      "v2SignedData": {
+        "properties": {
+          "data": {
+            "description": "The encoded data.",
+            "format": "byte",
+            "readOnly": true,
+            "type": "string"
+          },
+          "signature": {
+            "description": "The signature on the encoded data.",
+            "format": "byte",
+            "readOnly": true,
+            "type": "string"
+          },
+          "type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/v2SignedDataTypeEnum"
+              }
+            ],
+            "description": "The type of the encoded data.",
+            "readOnly": true
+          }
+        },
+        "title": "SignedData represents data that has been cryptographically signed",
+        "type": "object"
+      },
+      "v2SignedDataTypeEnum": {
+        "enum": [
+          "JSON_V1",
+          "LEGACY",
+          "MERKLE_ROOT",
+          "COINCOVER_V1",
+          "STATION70_V1",
+          "COINCOVER_V2"
+        ],
+        "title": "- COINCOVER_V1: Coincover signature over the public key\n - STATION70_V1: Station70 signature format\n - COINCOVER_V2: Coincover signature over a vault-bound payload",
+        "type": "string"
+      },
+      "v2SimulateTransactionResponse": {
+        "properties": {
+          "referencedAddressesInfo": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/v2NetworkAddressInfo"
+            },
+            "description": "A mapping of the referenced addresses in the message.\nThe key is the address and the value is the corresponding address info.",
+            "type": "object"
+          },
+          "referencedResources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/v2ReferencedResource"
+            },
+            "description": "A mapping of the referenced resources in the message.\nThe key is the resource name and the value is the corresponding resource.",
+            "type": "object"
+          },
+          "transactionSimulation": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/v2TransactionSimulation"
+              }
+            ],
+            "description": "The estimated execution result of the transaction.\n\nThe simulation is not persisted, so it has no resource name and cannot be\nretrieved again."
+          }
+        },
+        "type": "object"
       },
       "v2SolanaSerializedTransaction": {
         "properties": {
@@ -3923,6 +5000,37 @@
         ],
         "type": "object"
       },
+      "v2StellarMemo": {
+        "properties": {
+          "data": {
+            "description": "The data of the memo.",
+            "type": "string"
+          },
+          "type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/v2StellarMemoMemoTypeEnum"
+              }
+            ],
+            "description": "The type of the memo."
+          }
+        },
+        "required": [
+          "type",
+          "data"
+        ],
+        "type": "object"
+      },
+      "v2StellarMemoMemoTypeEnum": {
+        "description": " - TEXT: A text memo. Limited to 28 bytes.\n - ID: A id memo. An unsigned 64-bit integer.\n - HASH: A hash memo. A hex string of the hash with a `0x` prefix.\n - RETURN: A return memo. A hex string of the return hash with a `0x` prefix.",
+        "enum": [
+          "TEXT",
+          "ID",
+          "HASH",
+          "RETURN"
+        ],
+        "type": "string"
+      },
       "v2StellarRawTransaction": {
         "properties": {
           "network": {
@@ -3954,6 +5062,37 @@
           "xdrEnvelope"
         ],
         "type": "object"
+      },
+      "v2StellarTransactionMemo": {
+        "properties": {
+          "data": {
+            "description": "The data of the memo. See documentation on enum values for the exact format.\n\nSee https://developers.stellar.org/docs/learn/fundamentals/transactions/operations-and-transactions#memo for more information.",
+            "type": "string"
+          },
+          "type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/v2StellarTransactionMemoTypeEnum"
+              }
+            ],
+            "description": "The type of the memo."
+          }
+        },
+        "required": [
+          "type",
+          "data"
+        ],
+        "type": "object"
+      },
+      "v2StellarTransactionMemoTypeEnum": {
+        "description": " - TEXT: A text memo. Limited to 28 bytes.\n - ID: A id memo. An unsigned 64-bit integer.\n - HASH: A hash memo. A hex string of the hash with a `0x` prefix.\n - RETURN: A return memo. A hex string of the return hash with a `0x` prefix.",
+        "enum": [
+          "TEXT",
+          "ID",
+          "HASH",
+          "RETURN"
+        ],
+        "type": "string"
       },
       "v2StellarTransactionOperation": {
         "properties": {
@@ -4025,6 +5164,14 @@
             ],
             "readOnly": true
           },
+          "annotations": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Client-defined key/value metadata attached at initiation via\nInitiateTransactionRequest.annotations.\n\nStored but never interpreted by Utila, and visible read-only to every party\nwho can view the transaction. Avoid storing secrets or sensitive data here.",
+            "readOnly": true,
+            "type": "object"
+          },
           "aptosTransaction": {
             "allOf": [
               {
@@ -4083,6 +5230,15 @@
             ],
             "readOnly": true
           },
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/googlerpcStatus"
+              }
+            ],
+            "description": "The latest error for this transaction, if any.\n\nWhich error is surfaced depends on the transaction's current state.",
+            "readOnly": true
+          },
           "evmAccountDelegation": {
             "allOf": [
               {
@@ -4111,11 +5267,6 @@
             "description": "The time at which the transaction was expired.",
             "format": "date-time",
             "readOnly": true,
-            "type": "string"
-          },
-          "gasStationOrder": {
-            "readOnly": true,
-            "title": "The gas station order name",
             "type": "string"
           },
           "hash": {
@@ -4270,6 +5421,14 @@
             },
             "type": "array"
           },
+          "tronPersonalSign": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/v2TransactionTronPersonalSign"
+              }
+            ],
+            "description": "If this is a Tron personal-sign message, the message will be listed here."
+          },
           "tronTransaction": {
             "allOf": [
               {
@@ -4400,6 +5559,11 @@
               }
             ],
             "description": "EIP-7702 Authorization details."
+          },
+          "chainId": {
+            "description": "The EIP-155 chain ID of the network this transaction targets.\n\nDecimal string (e.g. `1`, `11155111`).",
+            "readOnly": true,
+            "type": "string"
           },
           "data": {
             "description": "Hex encoded transaction data.\n\nExample: `0xda82fb4c00000a` or `da82fb4c00000a`.",
@@ -4552,6 +5716,11 @@
             "format": "date-time",
             "type": "string"
           },
+          "evmSubmissionDetails": {
+            "description": "The EVM submission that this transaction is part of.\n\nA submission groups the transactions that are broadcast together as a single\ngas-abstracted (sponsored) EVM submission — for example the EIP-7702\nauthorization and the user-operation transactions signed by the user. It is\nonly set for transactions that belong to such a submission.\n\nCall `Transactions.GetEVMSubmissionDetails` with this resource name to fetch\nthe full submission details.\n\nFormat: `vaults/{vault_id}/evmSubmissionDetails/{submission_id}`",
+            "readOnly": true,
+            "type": "string"
+          },
           "expireTime": {
             "description": "The timestamp when the transaction expires.",
             "format": "date-time",
@@ -4568,10 +5737,31 @@
             "format": "date-time",
             "type": "string"
           },
+          "gasStation": {
+            "description": "The gas station that sponsors this transaction request, if any.\n\nFormat: `vaults/{vault_id}/gasStations/{gas_station_id}`.",
+            "example": "vaults/1b2563/gasStations/a4b3df",
+            "readOnly": true,
+            "type": "string"
+          },
+          "gasStationOrder": {
+            "description": "The gas station order created to sponsor this transaction request, if any.\n\nFormat: `vaults/{vault_id}/gasStations/{gas_station_id}/orders/{order_id}`.",
+            "example": "vaults/1b2563/gasStations/a4b3df/orders/123456",
+            "readOnly": true,
+            "type": "string"
+          },
           "initiator": {
             "description": "The initiator of the transaction.\n\nFormat: `users/{user}`",
             "example": "users/2d2e40r3",
             "type": "string"
+          },
+          "initiatorRequestSignature": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/v2RequestSignature"
+              }
+            ],
+            "description": "Set when this initiation was signed. Unset for an unsigned transaction.",
+            "readOnly": true
           },
           "name": {
             "description": "The resource name of the transaction request.\n\nFormat: `vaults/{vault_id}/transactionRequests/{transaction_request_id}`.",
@@ -4614,6 +5804,12 @@
             "example": "wallets/2d2e40r3",
             "type": "string",
             "x-protoOneof": "source"
+          },
+          "sponsorWallet": {
+            "description": "The sponsor wallet for sponsored transactions (e.g., EVM, Solana).\nOnly populated when the sponsor is a Utila-managed wallet in the vault.\n\nFormat: `vaults/{vault_id}/wallets/{wallet_id}`",
+            "example": "vaults/2d2e40r3/wallets/2d2e40r3",
+            "readOnly": true,
+            "type": "string"
           },
           "transactionBundle": {
             "description": "The transaction bundle that this transaction belongs to.",
@@ -4687,6 +5883,10 @@
             "description": "Transaction fee in lamports.",
             "type": "string"
           },
+          "memo": {
+            "description": "The on-chain memo attached to the transfer via the Memo program, if any.",
+            "type": "string"
+          },
           "rawTransaction": {
             "description": "The full transaction payload, serialized.\n\nThe message and signatures, encoded in base64 format.",
             "format": "byte",
@@ -4707,7 +5907,7 @@
         "type": "object"
       },
       "v2TransactionStateEnum": {
-        "description": "The state of the transaction.\n\n - AWAITING_APPROVAL: Transaction requires approving votes.\n - AWAITING_AML_POLICY_CHECK: The transaction is waiting for the AML policy check to be completed.\nRelevant only for outgoing transactions.\n - DECLINED_BY_AML_POLICY: Transaction was declined by the AML policy Relevant only for outgoing transactions.\n - AWAITING_POLICY_CHECK: Transaction is waiting for the policy check to be completed.\n - AWAITING_SIGNATURE: Transaction is approved and ready to be signed.\n - SIGNED: Transaction is signed but not yet published.\n - AWAITING_PUBLISH: Transaction has been sent to the publishing queue.\n - PUBLISHED: Transaction has been published to the blockchain's mem-pool.\n - MINED: Transaction has been included in a block successfully.\n - MINED_FAILED: Transaction has entered a block but in a failed state (e.g. a failed smart contract call).\n - FAILED: Transaction has entered a block but in a failed state and was confirmed as such by multiple blocks\n - DECLINED: Transaction was declined by a policy check.\n - REPLACED: Transaction was replaced by a new transaction (same nonce or RBF).\n - CANCELED: Transaction was canceled by its initiator or by an admin.\n - DROPPED: Transaction was dropped by the network without being included in a block.\n - CONFIRMED: Transaction has been confirmed by multiple blocks in the blockchain.\n - EXPIRED: Transaction was expired after a certain amount of time.",
+        "description": "The state of the transaction.\n\n - AWAITING_APPROVAL: Transaction requires approving votes.\n - AWAITING_AML_POLICY_CHECK: The transaction is waiting for the AML policy check to be completed.\nRelevant only for outgoing transactions.\n - DECLINED_BY_AML_POLICY: Transaction was declined by the AML policy Relevant only for outgoing transactions.\n - AWAITING_POLICY_CHECK: Transaction is waiting for the policy check to be completed.\n - AWAITING_SIGNATURE: Transaction is approved and ready to be signed.\n - SIGNED: Transaction is signed but not yet published.\n - AWAITING_PUBLISH: Transaction has been sent to the publishing queue.\n - PUBLISHED: Transaction has been published to the blockchain's mem-pool.\n - MINED: Transaction has been included in a block successfully.\n - MINED_FAILED: Transaction has entered a block but in a failed state (e.g. a failed smart contract call).\n - FAILED: Transaction has entered a block but in a failed state and was confirmed as such by multiple blocks\n - DECLINED: Transaction was declined by a policy check.\n - REPLACED: Transaction was replaced by a new transaction (same nonce or RBF).\n - CANCELED: Transaction was canceled by its initiator or by an admin.\n - DROPPED: Transaction was dropped by the network without being included in a block.\n - CONFIRMED: Transaction has been confirmed by multiple blocks in the blockchain.\n - EXPIRED: Transaction was expired after a certain amount of time.\n - AWAITING_BUNDLE_APPROVAL: Approved bundle member waiting for sibling approvals; cannot be signed.",
         "enum": [
           "AWAITING_APPROVAL",
           "AWAITING_AML_POLICY_CHECK",
@@ -4725,7 +5925,8 @@
           "CANCELED",
           "DROPPED",
           "CONFIRMED",
-          "EXPIRED"
+          "EXPIRED",
+          "AWAITING_BUNDLE_APPROVAL"
         ],
         "type": "string"
       },
@@ -4740,7 +5941,7 @@
           "memo": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/v2TransactionStellarTransactionMemo"
+                "$ref": "#/components/schemas/v2StellarMemo"
               }
             ],
             "description": "The memo attached to the transaction.",
@@ -4785,38 +5986,8 @@
         },
         "type": "object"
       },
-      "v2TransactionStellarTransactionMemo": {
-        "properties": {
-          "data": {
-            "description": "The data of the memo.",
-            "type": "string"
-          },
-          "type": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/v2TransactionStellarTransactionMemoTypeEnum"
-              }
-            ],
-            "description": "The type of the memo."
-          }
-        },
-        "required": [
-          "type",
-          "data"
-        ],
-        "type": "object"
-      },
-      "v2TransactionStellarTransactionMemoTypeEnum": {
-        "description": " - TEXT: A text memo. Limited to 28 bytes.\n - ID: A id memo. An unsigned 64-bit integer.\n - HASH: A hash memo. A hex string of the hash with a `0x` prefix.\n - RETURN: A return memo. A hex string of the return hash with a `0x` prefix.",
-        "enum": [
-          "TEXT",
-          "ID",
-          "HASH",
-          "RETURN"
-        ],
-        "type": "string"
-      },
       "v2TransactionSubTypeEnum": {
+        "description": " - EVM_ZAMA_CONFIDENTIAL_TOKEN_ACTIVATION: The transaction activates a wallet for Zama confidential (ERC-7984) tokens.",
         "enum": [
           "NATIVE_TRANSFER",
           "TOKEN_TRANSFER",
@@ -4846,9 +6017,10 @@
           "BTC_PSBT",
           "BTC_TRANSFER",
           "BTC_SIGN_MESSAGE",
-          "ALEO_SHIELD",
-          "ALEO_UNSHIELD",
-          "ALEO_CONSOLIDATE"
+          "SHIELD",
+          "UNSHIELD",
+          "ALEO_CONSOLIDATE",
+          "EVM_ZAMA_CONFIDENTIAL_TOKEN_ACTIVATION"
         ],
         "type": "string"
       },
@@ -4928,6 +6100,25 @@
         },
         "type": "object"
       },
+      "v2TransactionTronPersonalSign": {
+        "description": "A Tron (TIP-191) personal-sign message. Distinct from EVMMessage so a Tron\npersonal sign is not represented as an EVM message.",
+        "properties": {
+          "message": {
+            "description": "Best-effort human-readable payload: set only when the signed bytes are\nvalid UTF-8. Empty for binary messages. Use `message_hex` for the exact,\nunambiguous bytes.",
+            "type": "string"
+          },
+          "messageHex": {
+            "description": "The exact signed payload as a hex string (e.g. \"0xabcd\"). Always set. This\nis authoritative; `message` is only a display convenience and cannot be\nused to recover the bytes unambiguously.",
+            "type": "string"
+          },
+          "signature": {
+            "description": "ECDSA signature (65 bytes) of the message.",
+            "format": "byte",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "v2TransactionTronTransaction": {
         "properties": {
           "cancelAllUnfreezeV2": {
@@ -4935,6 +6126,12 @@
           },
           "delegateResource": {
             "$ref": "#/components/schemas/v2TransactionTronTransactionDelegateResource"
+          },
+          "expireTime": {
+            "description": "When the signed transaction expires on the TRON network (raw_data.expiration).\nEmpty until the transaction is prepared for signature, or until raw data\nalready includes expiration (user-supplied raw txs).",
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
           },
           "fee": {
             "allOf": [
@@ -4947,9 +6144,27 @@
           "freezeBalanceV2": {
             "$ref": "#/components/schemas/v2TransactionTronTransactionFreezeBalanceV2"
           },
+          "refBlockBytes": {
+            "description": "The reference block bytes of the transaction (raw_data.ref_block_bytes).\nBytes 6-8 of the reference block number (2 bytes).\nEmpty until the transaction is prepared for signature, or until raw data\nalready includes it (user-supplied raw txs).\n\nExample (base64 in JSON): `j1g=`.",
+            "format": "byte",
+            "readOnly": true,
+            "type": "string"
+          },
+          "refBlockHash": {
+            "description": "The reference block hash of the transaction (raw_data.ref_block_hash).\nBytes 8-16 of the reference block hash (8 bytes).\nEmpty until the transaction is prepared for signature, or until raw data\nalready includes it (user-supplied raw txs).\n\nExample (base64 in JSON): `7jHKhJbGGlE=`.",
+            "format": "byte",
+            "readOnly": true,
+            "type": "string"
+          },
           "signature": {
             "description": "ECDSA signature (65 bytes) of the transaction.\n\nAvailable when the transaction has been signed.\n\nEncoded in standard TRON format:\n  - Bytes [0-31]: R component (32 bytes, big-endian)\n  - Bytes [32-63]: S component (32 bytes, big-endian)\n  - Byte [64]: V component (recovery identifier)",
             "format": "byte",
+            "readOnly": true,
+            "type": "string"
+          },
+          "timestamp": {
+            "description": "The creation time of the transaction as set in its raw data (raw_data.timestamp),\nin milliseconds since the Unix epoch.\nEmpty until the transaction is prepared for signature, or until raw data\nalready includes it (user-supplied raw txs).\n\nExample: `1759838400000`.\n",
+            "format": "int64",
             "readOnly": true,
             "type": "string"
           },
@@ -5315,6 +6530,28 @@
         },
         "type": "object"
       },
+      "v2TronGasStationFee": {
+        "properties": {
+          "asset": {
+            "description": "The asset the price is denominated in.\n\nFormat: `assets/{asset}`",
+            "example": "assets/native.tron-mainnet",
+            "readOnly": true,
+            "type": "string"
+          },
+          "order": {
+            "description": "The gas station order that paid for this transaction's resources.\n\nFormat: `vaults/{vault}/gasStations/{gas_station}/orders/{order}`",
+            "example": "vaults/1b2563/gasStations/a4b3df/orders/123456",
+            "readOnly": true,
+            "type": "string"
+          },
+          "price": {
+            "description": "The price paid for the order, as a decimal string in `asset` units.",
+            "readOnly": true,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "v2TronResourceFee": {
         "description": "Resource-level fee breakdown for a Tron resource (bandwidth or energy).",
         "properties": {
@@ -5371,8 +6608,17 @@
             ],
             "description": "Energy resource fee breakdown."
           },
+          "gasStationFee": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/v2TronGasStationFee"
+              }
+            ],
+            "description": "The gas station fee paid to sponsor this transaction, if any.",
+            "readOnly": true
+          },
           "usedSun": {
-            "description": "The amount of sun used by the transaction.",
+            "description": "The amount of TRX burned on-chain by the sender wallet, in SUN.",
             "type": "string"
           }
         },
@@ -5480,6 +6726,14 @@
             "example": "Fund VI",
             "type": "string"
           },
+          "keySetupMode": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/v2KeySetupModeEnum"
+              }
+            ],
+            "description": "How vault keys are set up / imported."
+          },
           "name": {
             "description": "The resource name of the vault.\n\nFormat: `vaults/{vault_id}`",
             "example": "vaults/95257c5a522f",
@@ -5536,6 +6790,15 @@
         ],
         "type": "string"
       },
+      "v2VerificationStatusEnum": {
+        "description": "- VERIFIED: Address is verified\n - PENDING: Address is pending verification",
+        "enum": [
+          "VERIFIED",
+          "PENDING"
+        ],
+        "title": "Verification status enum values",
+        "type": "string"
+      },
       "v2VoteOnTransactionRequestRequestVote": {
         "description": "The vote to cast on the transaction request.",
         "enum": [
@@ -5580,10 +6843,20 @@
           "createParams": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/WalletCreateParams"
+                "$ref": "#/components/schemas/v2WalletCreateParams"
               }
             ],
             "description": "Parameters only used during wallet creation. Not included in responses."
+          },
+          "createTime": {
+            "description": "The time when the wallet was created.",
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          },
+          "creator": {
+            "readOnly": true,
+            "type": "string"
           },
           "displayName": {
             "description": "A human-readable name.\n\nMust match the regular expression `[a-zA-Z0-9\\.,:\\-'# _$]+$` and be shorter than 100 characters",
@@ -5610,6 +6883,11 @@
             "readOnly": true,
             "type": "boolean"
           },
+          "incompleteValue": {
+            "description": "Whether `converted_value` omits confidential balances that could not be read.\nIncluded only when `FULL` view is requested.\n\nWhen true, `converted_value` is a lower bound: the unreadable amounts count\nas zero.",
+            "readOnly": true,
+            "type": "boolean"
+          },
           "name": {
             "description": "The resource name of the wallet.\n\nFormat: `vaults/{vault_id}/wallets/{wallet_id}`",
             "example": "vaults/1b25635a5b3f/wallets/95257c5a522f",
@@ -5633,6 +6911,15 @@
               }
             ],
             "description": "If this wallet contains a Solana network, this field will be populated.",
+            "readOnly": true
+          },
+          "stellarDetails": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/v2WalletStellarDetails"
+              }
+            ],
+            "description": "If this wallet contains a Stellar network, this field will be populated.",
             "readOnly": true
           },
           "tonDetails": {
@@ -5677,6 +6964,14 @@
             "readOnly": true,
             "type": "string"
           },
+          "createParams": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/v2WalletAddressCreateParams"
+              }
+            ],
+            "description": "Parameters only used during wallet address creation. Not included in\nresponses."
+          },
           "displayName": {
             "description": "A human-readable name.\nRelevant only for deposit addresses.\n\nMust match the regular expression `[a-zA-Z0-9\\.,:\\-'# _$]+$` and be shorter than 100 characters",
             "example": "Hal's Address 3",
@@ -5685,7 +6980,7 @@
           "format": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/WalletAddressFormat"
+                "$ref": "#/components/schemas/v2WalletAddressFormat"
               }
             ],
             "description": "Address format.",
@@ -5761,6 +7056,10 @@
             "example": "13000000",
             "type": "string"
           },
+          "unknownValue": {
+            "description": "Whether the value of this balance is unknown to Utila.\n\nSet only for confidential token balances whose encrypted amount could not\nbe decrypted. When true, `value` and `raw_value` are reported as `0`.",
+            "type": "boolean"
+          },
           "value": {
             "description": "The amount of the asset, in decimal form with precision included.",
             "example": "1.3",
@@ -5773,6 +7072,52 @@
           }
         },
         "type": "object"
+      },
+      "v2WalletAddressCreateParams": {
+        "description": "Parameters only used during wallet address creation.",
+        "properties": {
+          "btcDetails": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/v2WalletAddressCreateParamsBTCDetails"
+              }
+            ],
+            "description": "Bitcoin-specific creation parameters."
+          }
+        },
+        "type": "object"
+      },
+      "v2WalletAddressCreateParamsBTCDetails": {
+        "description": "Bitcoin-specific creation parameters.",
+        "properties": {
+          "format": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BTCDetailsAddressFormat"
+              }
+            ],
+            "description": "Address format for the new address.\n\nOnly valid when the wallet has no address on this network yet (i.e.\nwhen this request adds the network to the wallet); once a wallet has\nan address on a Bitcoin-based network, every further address uses the\nsame format, and a mismatching value is rejected.\n\nPer-chain supported formats and defaults are listed in the create\nparams of `CreateWallet`.\n\nSetting this for a non-Bitcoin-based network is an error.",
+            "example": "P2TR"
+          }
+        },
+        "required": [
+          "format"
+        ],
+        "type": "object"
+      },
+      "v2WalletAddressFormat": {
+        "description": " - BITCOIN_P2PKH: Bitcoin P2PKH address format.\n - BITCOIN_P2WPKH: Bitcoin P2WPKH address format.\n - EVM: Ethereum address format.\n - TRON_BASE58: Tron base58 address format.\n - BASE58: Solana address format.\n - TON_NON_BOUNCEABLE: Ton address format.\n - SUBSTRATE_58: Substrate address format.\n - BITCOIN_P2TR: Bitcoin P2TR (Taproot, BIP-341) address format.",
+        "enum": [
+          "BITCOIN_P2PKH",
+          "BITCOIN_P2WPKH",
+          "EVM",
+          "TRON_BASE58",
+          "BASE58",
+          "TON_NON_BOUNCEABLE",
+          "SUBSTRATE_58",
+          "BITCOIN_P2TR"
+        ],
+        "type": "string"
       },
       "v2WalletAddressType": {
         "description": " - MAIN: Main address (main address of the wallet).\n - DEPOSIT: Deposit address.\n - CHANGE: Change address.",
@@ -5797,6 +7142,16 @@
       },
       "v2WalletBTCDetailsBTCNetworkDetails": {
         "properties": {
+          "format": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BTCDetailsAddressFormat"
+              }
+            ],
+            "description": "Address format of `main_address`.",
+            "example": "P2WPKH",
+            "readOnly": true
+          },
           "mainAddress": {
             "description": "The main deposit address of the wallet in the network.",
             "readOnly": true,
@@ -5832,6 +7187,10 @@
             "example": "13000000",
             "type": "string"
           },
+          "unknownValue": {
+            "description": "Whether the value of this balance is unknown to Utila.\n\nSet only for confidential token balances whose encrypted amount could not\nbe decrypted. When true, `value` and `raw_value` are reported as `0`.",
+            "type": "boolean"
+          },
           "value": {
             "description": "The amount of the asset, in decimal form with precision included.",
             "example": "1.3",
@@ -5845,7 +7204,54 @@
         },
         "type": "object"
       },
+      "v2WalletCreateParams": {
+        "description": "Parameters only used during wallet creation.",
+        "properties": {
+          "btcDetails": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/v2WalletCreateParamsBTCDetails"
+              }
+            ],
+            "description": "Bitcoin-specific creation parameters."
+          },
+          "walletGroups": {
+            "description": "Wallet will be assigned to these wallet groups upon creation.\nEach group must have `allow_assignment_on_wallet_creation` enabled.\n\nFormat: `vaults/{vault_id}/policy/walletGroups/{wallet_group_id}`. The\nlegacy `vaults/{vault_id}/walletGroups/{wallet_group_id}` is also accepted.",
+            "example": [
+              "vaults/1b25635a5b3f/policy/walletGroups/95257c5a522f"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "v2WalletCreateParamsBTCDetails": {
+        "description": "Bitcoin-specific creation parameters. Ignored on non-Bitcoin wallets.",
+        "properties": {
+          "btcNetworkDetails": {
+            "description": "Per-network format selections. Bitcoin-based networks in the wallet\nthat are not listed here use their default format. Each `network` must\nappear at most once.",
+            "items": {
+              "$ref": "#/components/schemas/WalletCreateParamsBTCDetailsBTCNetworkDetails"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
       "v2WalletEVMDetails": {
+        "properties": {
+          "address": {
+            "description": "The address of the wallet.",
+            "readOnly": true,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2WalletStellarDetails": {
         "properties": {
           "address": {
             "description": "The address of the wallet.",
@@ -5875,6 +7281,12 @@
       },
       "v2WalletconnectSession": {
         "properties": {
+          "createTime": {
+            "description": "The time the session was created.",
+            "format": "date-time",
+            "readOnly": true,
+            "type": "string"
+          },
           "initiator": {
             "description": "The initiator of the walletconnect session.\n\nFormat: `users/{user_id}`.",
             "readOnly": true,
@@ -5899,6 +7311,20 @@
             ],
             "description": "The peer of the walletconnect session.",
             "readOnly": true
+          },
+          "verificationContext": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WalletconnectSessionVerificationContext"
+              }
+            ],
+            "description": "The WalletConnect verification context for the peer.",
+            "readOnly": true
+          },
+          "wallet": {
+            "description": "The wallet the session is connected to.\n\nFormat: `vaults/{vault_id}/wallets/{wallet_id}`.",
+            "readOnly": true,
+            "type": "string"
           }
         },
         "type": "object"
@@ -6119,6 +7545,47 @@
         ]
       }
     },
+    "/v2/networks/{network_id}/erc7984ConfidentialTokens": {
+      "get": {
+        "description": "List the confidential tokens supported on a network, each with the public\ntoken it wraps.",
+        "operationId": "ERC7984ConfidentialTokens_ListERC7984ConfidentialTokens",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "network_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Include referenced resources in the response.",
+            "in": "query",
+            "name": "includeReferencedResources",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ListERC7984ConfidentialTokensResponse"
+                }
+              }
+            },
+            "description": "A successful response."
+          }
+        },
+        "summary": "ListERC7984ConfidentialTokens",
+        "tags": [
+          "Confidential Tokens"
+        ]
+      }
+    },
     "/v2/vaults": {
       "get": {
         "description": "Retrieve a list of all vaults accessible to the authenticated user.",
@@ -6246,7 +7713,7 @@
             }
           },
           {
-            "description": "A filter expression that filters address book entries listed in the response.\n\nSupported fields and functions:\n| Name | Description | Example |\n|------|-------------|---------|\n| `network` | Filter by one or more networks (`string...`). | `network(\"networks/ethereum-mainnet\")` |\n| `address` | Filter by one or more addresses, case-insensitive (`string...`). | `address(\"0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6\")` |\n| `display_name` | Filter by one or more display names, exact match and case-sensitive, supports a maximum of 100 display names. (`string...`). | `display_name(\"Cold Storage\", \"My Wallet\")` |\n| `create_time` | Filter by creation time (`string` comparison). | `create_time > \"2023-08-29T18:04:00Z\"` |",
+            "description": "A filter expression that filters address book entries listed in the response.\n\nSupported fields and functions:\n| Name | Description | Example |\n|------|-------------|---------|\n| `network` | Filter by one or more networks (`string...`). | `network(\"networks/ethereum-mainnet\")` |\n| `network_family` | Filter by one or more network families (`enum...`). | `network_family(EVM)` |\n| `address` | Filter by one or more addresses, case-insensitive (`string...`). | `address(\"0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6\")` |\n| `display_name` | Filter by one or more display names, exact match and case-sensitive, supports a maximum of 100 display names. (`string...`). | `display_name(\"Cold Storage\", \"My Wallet\")` |\n| `create_time` | Filter by creation time (`string` comparison). | `create_time > \"2023-08-29T18:04:00Z\"` |",
             "in": "query",
             "name": "filter",
             "required": false,
@@ -6493,6 +7960,176 @@
         ]
       }
     },
+    "/v2/vaults/{vault_id}/evmSubmissionDetails/{evm_submission_detail_id}": {
+      "get": {
+        "description": "Get the details of an EVM submission — the set of transactions that are\nbroadcast together as a single gas-abstracted (sponsored) EVM submission.\n\nThe submission resource name is available on a transaction request via\n`TransactionRequest.evm_submission_details`.",
+        "operationId": "Transactions_GetEVMSubmissionDetails",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vault_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "evm_submission_detail_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2GetEVMSubmissionDetailsResponse"
+                }
+              }
+            },
+            "description": "A successful response."
+          }
+        },
+        "summary": "GetEVMSubmissionDetails",
+        "tags": [
+          "Transactions"
+        ]
+      }
+    },
+    "/v2/vaults/{vault_id}/gasStations": {
+      "get": {
+        "description": "Retrieve a list of all gas stations in a vault.",
+        "operationId": "GasStations_ListGasStations",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vault_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2ListGasStationsResponse"
+                }
+              }
+            },
+            "description": "A successful response."
+          }
+        },
+        "summary": "ListGasStations",
+        "tags": [
+          "Gas Stations"
+        ]
+      }
+    },
+    "/v2/vaults/{vault_id}/gasStations/{gas_station_id}/orders/{order_id}": {
+      "get": {
+        "description": "Get a gas station order by resource name.",
+        "operationId": "GasStations_GetGasStationOrder",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vault_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "gas_station_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2GetGasStationOrderResponse"
+                }
+              }
+            },
+            "description": "A successful response."
+          }
+        },
+        "summary": "GetGasStationOrder",
+        "tags": [
+          "Gas Stations"
+        ]
+      }
+    },
+    "/v2/vaults/{vault_id}/gasStations/{gas_station_id}:refreshGasStationBalance": {
+      "post": {
+        "description": "Refresh a gas station's cached balance from its provider.",
+        "operationId": "GasStations_RefreshGasStationBalance",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vault_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "gas_station_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GasStationsRefreshGasStationBalanceBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2RefreshGasStationBalanceResponse"
+                }
+              }
+            },
+            "description": "A successful response."
+          }
+        },
+        "summary": "RefreshGasStationBalance",
+        "tags": [
+          "Gas Stations"
+        ]
+      }
+    },
     "/v2/vaults/{vault_id}/networks": {
       "get": {
         "description": "Returns the list of vault networks available for use.",
@@ -6608,7 +8245,7 @@
             }
           },
           {
-            "description": "A filter string to filter the results.\nMore details about filtering can be found in the [Filtering Documentation Page](https://docs.utila.io/reference/filtering).\n\nSupported fields and functions:\n| Name | Description | Example |\n|------|-------------|---------|\n| `create_time` | Filter by creation time (`string` comparison). | `create_time > \"2023-08-29T18:04:00Z\"` |\n| `state` | Filter by one or more states (`enum...`). | `state(AWAITING_APPROVAL,AWAITING_SIGNATURE)` |\n| `spam` | Filter by spam status (`bool`). | `spam(false)` |\n| `from_wallet` | Filter by one or more source wallets (`string...`). | `from_wallet(\"vaults/123456789012/wallets/5a8b8085ccd0\")` |\n| `to_wallet` | Filter by one or more destination wallets (`string...`). | `to_wallet(\"vaults/123456789012/wallets/5a8b8085ccd0\")` |\n| `pending_user_approval` | Filter by user for which the transaction is awaiting approval (`string`). | `pending_user_approval(\"users/name@example.com\")` |\n| `asset` | Filter by one or more assets (`string...`). Supports v2 asset aliases. | `asset(\"assets/erc20.ethereum-mainnet.0x6b175474e89094c44da98b954eedeac495271d0f\")` |\n| `external_id` | Filter by client-provided external ID (`string`). | `external_id(\"order-123\")` |",
+            "description": "A filter string to filter the results.\nMore details about filtering can be found in the [Filtering Documentation Page](https://docs.utila.io/reference/filtering).\n\nSupported fields and functions:\n| Name | Description | Example |\n|------|-------------|---------|\n| `create_time` | Filter by creation time (`string` comparison). | `create_time > \"2023-08-29T18:04:00Z\"` |\n| `state` | Filter by one or more states (`enum...`). | `state(AWAITING_APPROVAL,AWAITING_SIGNATURE)` |\n| `spam` | Filter by spam status (`bool`). | `spam(false)` |\n| `from_wallet` | Filter by one or more source wallets (`string...`). | `from_wallet(\"vaults/123456789012/wallets/5a8b8085ccd0\")` |\n| `to_wallet` | Filter by one or more destination wallets (`string...`). | `to_wallet(\"vaults/123456789012/wallets/5a8b8085ccd0\")` |\n| `pending_user_approval` | Filter by user for which the transaction is awaiting approval (`string`). | `pending_user_approval(\"users/name@example.com\")` |\n| `asset` | Filter by one or more assets (`string...`). Supports v2 asset aliases. | `asset(\"assets/erc20.ethereum-mainnet.0x6b175474e89094c44da98b954eedeac495271d0f\")` |\n| `sponsor` | Filter by one or more sponsors: gas station, wallet, wallet address, or raw address (`string...`). | `sponsor(\"vaults/123456789012/gasStations/a4b3df\")` |\n| `external_id` | Filter by client-provided external ID (`string`). | `external_id(\"order-123\")` |\n| `name` | Filter by one or more transaction resource names or IDs (`string...`). | `name(\"vaults/123456789012/transactions/abc123\")` |\n| `tx_hash` | Filter by one or more on-chain transaction hashes (`string...`). | `tx_hash(\"0xabc123\")` |\n| `sub_type` | Filter by one or more transaction subtypes (`enum...`). | `sub_type(SUBMITTING_TRANSACTION,NATIVE_TRANSFER)` |",
             "in": "query",
             "name": "filter",
             "required": false,
@@ -6887,7 +8524,7 @@
     },
     "/v2/vaults/{vault_id}/transactions/{transaction_id}:publish": {
       "post": {
-        "description": "Manually publishes a signed transaction to the blockchain. This endpoint synchronously\nbroadcasts the transaction to the network and returns the updated transaction details.\nThe transaction must be fully signed before publishing.\n\n**Note:** Currently only available for EVM-compatible blockchains. Support for additional\nblockchains will be added in future releases.",
+        "description": "Manually publishes a signed transaction to the blockchain. This endpoint synchronously\nbroadcasts the transaction to the network and returns the updated transaction details.\nThe transaction must be fully signed before publishing. An already published transaction\ncan be published again to rebroadcast it.",
         "operationId": "Transactions_PublishTransaction",
         "parameters": [
           {
@@ -6980,6 +8617,56 @@
           }
         },
         "summary": "ReplaceTransaction",
+        "tags": [
+          "Transactions"
+        ]
+      }
+    },
+    "/v2/vaults/{vault_id}/transactions/{transaction_id}:setNote": {
+      "post": {
+        "description": "Sets the note on a transaction. The note is visible to all vault members.\nSend an empty note to clear it. Notes are limited to 600 characters.\n\nThe response contains the transaction after the note is saved.",
+        "operationId": "Transactions_SetTransactionNote",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vault_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "transaction_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransactionsSetTransactionNoteBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2SetTransactionNoteResponse"
+                }
+              }
+            },
+            "description": "A successful response."
+          }
+        },
+        "summary": "SetTransactionNote",
         "tags": [
           "Transactions"
         ]
@@ -7131,6 +8818,48 @@
           }
         },
         "summary": "InitiateTransaction",
+        "tags": [
+          "Transactions"
+        ]
+      }
+    },
+    "/v2/vaults/{vault_id}/transactions:simulate": {
+      "post": {
+        "description": "Simulate a transaction without creating it, to preview its estimated\nexecution result such as balance changes or the reason it would fail.\n\nNothing is persisted: no transaction is created, no policy or approval is\nevaluated, and no nonce is consumed. A transaction the network would reject\nstill returns a successful response, with the reason reported in\n`transaction_simulation.error`.",
+        "operationId": "Transactions_SimulateTransaction",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vault_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransactionsSimulateTransactionBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2SimulateTransactionResponse"
+                }
+              }
+            },
+            "description": "A successful response."
+          }
+        },
+        "summary": "SimulateTransaction",
         "tags": [
           "Transactions"
         ]
@@ -7384,6 +9113,15 @@
             "description": "A page token, received from the previous list call as `nextPageToken`.",
             "in": "query",
             "name": "pageToken",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "A filter expression that filters wallet addresses listed in the response.\n\nSupported fields and functions:\n| Name | Description | Example |\n|------|-------------|---------|\n| `address` | Filter by one or more on-chain addresses (`string...`). | `address(\"0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6\")` |\n| `network` | Filter by one or more networks (`string...`). | `network(\"networks/ethereum-mainnet\")` |\n\nTip: combine a wildcard wallet (`-`) in the parent with the `address` filter to look up\naddresses across all wallets in a vault.",
+            "in": "query",
+            "name": "filter",
             "required": false,
             "schema": {
               "type": "string"
@@ -7674,6 +9412,114 @@
         "summary": "ArchiveWallet",
         "tags": [
           "Wallets"
+        ]
+      }
+    },
+    "/v2/vaults/{vault_id}/wallets/{wallet_id}:deriveContextHash": {
+      "post": {
+        "description": "Derive a deterministic 32-byte value bound to (wallet main address,\nnetwork, application, context). The derivation is stateless: the same\ninputs always yield the same output (so it can be re-derived later), and\nchanging any input produces an independent, unpredictable output. This\nvalue should not be relied on for long-term confidentiality.",
+        "operationId": "Wallets_DeriveContextHash",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vault_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "wallet_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WalletsDeriveContextHashBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2DeriveContextHashResponse"
+                }
+              }
+            },
+            "description": "A successful response."
+          }
+        },
+        "summary": "DeriveContextHash",
+        "tags": [
+          "Wallets"
+        ]
+      }
+    },
+    "/v2/vaults/{vault_id}/wallets/{wallet_id}:getEvmZamaConfidentialActivation": {
+      "get": {
+        "description": "Retrieve the confidential tokens a wallet is activated for, with the expiry\nof each activation.",
+        "operationId": "ERC7984ConfidentialTokens_GetEVMZamaConfidentialActivation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vault_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "wallet_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The resource name of the network whose activations should be returned.\n\nFormat: `networks/{network_id}`",
+            "in": "query",
+            "name": "network",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Include referenced resources in the response.",
+            "in": "query",
+            "name": "includeReferencedResources",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2GetEVMZamaConfidentialActivationResponse"
+                }
+              }
+            },
+            "description": "A successful response."
+          }
+        },
+        "summary": "GetEVMZamaConfidentialActivation",
+        "tags": [
+          "Confidential Tokens"
         ]
       }
     },
@@ -8101,6 +9947,12 @@
       "name": "Policy"
     },
     {
+      "name": "Gas Stations"
+    },
+    {
+      "name": "Confidential Tokens"
+    },
+    {
       "description": "Webhooks are a powerful feature that enables you to stay up-to-date with events in Utila without the need for constant polling. Instead, we send data directly to your application when relevant events occur such as deposit to specific wallets, transaction state change, and wallet creation.\n\n## Webhook Creation\n\n1. In the [Console](https://console.utila.io) navigate to `Vault Settings` &rarr; `Webhooks`.\n\n1. Click on `Add Webhook`.\n\n1. Provide a display name for your webhook.\n\n1. Provide the URL where you want to receive webhook data. This is where we'll send notifications when the selected events occur.\\\n   You can test the endpoint by clicking on `Test` - this will send a test event to your endpoint.\n\n1. Select the events you want to be notified about. For example, you can choose to receive notifications when a new transaction is created.\n\n1. Click `Add` to save the webhook.\n\n## Webhook Event Payload\n\nWhen an event occurs, we'll send you a JSON payload containing the relevant information about the event.\\\n Here are example messages of what you might receive:\n\n### Transaction Created\n\n```json\n{\n  \"id\": \"94ea3ce9-fb6d-41f3-91aa-8c42f17df1f6\",\n  \"vault\": \"vaults/3bf247bc8ee2c\",\n  \"type\": \"TRANSACTION_CREATED\",\n  \"resourceType\": \"TRANSACTION\",\n  \"resource\": \"vaults/3bf247bc8ee2c/transactions/b6e3cd32e827\"\n}\n```\n\n### Transaction State Updated\n\n```json\n{\n  \"id\": \"9c683b37-bfb6-42f4-bcaa-1a6f46d3b6f8\",\n  \"vault\": \"vaults/3bf247bc8ee2c\",\n  \"type\": \"TRANSACTION_STATE_UPDATED\",\n  \"details\": {\n    \"transactionStateUpdated\": {\n      \"newState\": \"CONFIRMED\"\n    }\n  },\n  \"resourceType\": \"TRANSACTION\",\n  \"resource\": \"vaults/3bf247bc8ee2c/transactions/b6e3cd2e8217\"\n}\n```\n\n### Wallet Created\n\n```json\n{\n  \"id\": \"94ea3ce9-fb6d-41f3-91aa-8c42f17df1f6\",\n  \"vault\": \"vaults/3bf247bc8ee2c\",\n  \"type\": \"WALLET_CREATED\",\n  \"resourceType\": \"WALLET\",\n  \"resource\": \"vaults/3bf247bc8ee2c/wallets/b6e3cd32e827\"\n}\n```\n\n### Wallet Address Created\n\n```json\n{\n  \"id\": \"94ea3ce9-fb6d-41f3-91aa-8c42f17df1f6\",\n  \"vault\": \"vaults/3bf247bc8ee2c\",\n  \"type\": \"WALLET_ADDRESS_CREATED\",\n  \"resourceType\": \"WALLET_ADDRESS\",\n  \"resource\": \"vaults/3bf247bc8ee2c/wallets/b6e3cd32e827/addresses/4340c6919558\"\n}\n```\n\n### Transaction AML Screening Result Ready\n\n```json\n{\n  \"id\": \"30tv7byD3k1DLTU1xVVfeNnX3pa\",\n  \"vault\": \"vaults/489c81985ea0\",\n  \"type\": \"TRANSACTION_AML_SCREENING_RESULT_READY\",\n  \"details\": {\n    \"transactionAmlScreeningResultReady\": {\n      \"action\": \"ALLOW\"\n    }\n  },\n  \"resourceType\": \"TRANSACTION\",\n  \"resource\": \"vaults/489c81985ea0/transactions/fb9bb214db4a\"\n}\n``` \n\n## Webhook Security\n\nHere are some important requirements and guidelines to keep your webhook integration secure:\n\n- Use HTTPS in your webhook endpoint, to ensure data is encrypted in transit.\n\n- Validate the events using the signature attached in the request header:\n\n  - A signature on the event payload is attached in a request header named `x-utila-signature`.\n\n  - The signature is computed using RSA-4096 encryption, SHA512 hash and PSS padding, and encoded in base64.\n\n  - The signature can be validated using Utila's webhook public key:\n\n    ```text\n    -----BEGIN PUBLIC KEY-----\n    MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAulI1XPGRDFcymdf2zXvD\n    spfdTXA1g0NOavZ50+AtcQP7f+KTpXoO1bkr6x9dO2Jq8FHImRT1sbhKhcNXT4WC\n    dLSa/2Zh60QE3tp9d51o1XDSnzRMwcGbFyJ7C30DVpVEIwqD2Z5GRlzXinqIeVdY\n    GOubuVol/wOAynS32DX+6y2PiqbYj7P84csBOgpNT27Mc6InEqKb7LWQtU8LPttx\n    tfyceOPXE5G4h+UujPsPG6WN5MHHVbP9r6oneEF3knbfL3hCJRjwV9HfTtG6JyYr\n    25Dy6SOCphrlEZi8IGcKxL6fEMetDGGVCjm7XfHyt6fYoUonD9lZsvbSyUsRwf/1\n    +x77F2LxtzQyvMJR9jD16WUyzm+fUBSVQixxKnKSrVkeLqkmGboDTY5kw3doSVTP\n    zcGDzWkzqC3lgwRLnSg4J+koQY+yo9jYBbFdSp+/PfVmp9NEaBuCV63mp/85VWIh\n    1FRYe6lEdGZWdmIcbDvNYU/Cui/yGZoID7+sJJq/rWN0Qxx/0skEaT/083+iYLVA\n    QNLvWtmQfgNKPm6GeQknRUEWyWUJtq6ANeP/8hGVM1G/edOdLn+KfhXZvw41O5z1\n    uKHEqHIV+NaCNnFbDj924bJhA/fWNKxYv7/Nm44Wy1nXlgqdHiFkSqtjUBPmzE/n\n    yj92azWBq1RbGHY+9/POguMCAwEAAQ==\n    -----END PUBLIC KEY-----\n    ```\n\n  - See example below for validation\n\n## Webhook Response\n\nThe webhook endpoint is expected to respond with a success status code (200-299) to confirm the webhook event was received.\n\n## Webhook Retries\n\nIn case the webhook endpoint does not respond with a successful acknowledgment, we'll make multiple attempts to deliver the event using an exponential back-off mechanism (which means the time between each attempt gradually increases) for up to 24 hours, after which the event will be considered undeliverable and be discarded.\n\nThis retry mechanism ensures that even if there are temporary issues on your end, you have a 24-hour window to receive the event data successfully. It's designed to make your webhook integration as reliable as possible.\n\n## Webhook Example\n\nThe following code snippet is a webhook function configured to parse the event, handle it and return a 200 response upon successful handling.\n\n### Python\n\n```python\nimport base64\nfrom Cryptodome.PublicKey import RSA\nfrom Cryptodome.Signature import pss\nfrom Cryptodome.Hash import SHA512\nfrom flask import Flask, request\n\n\napp = Flask(__name__)\n\n@app.route('/webhook', methods=['POST'])\ndef webhook():\n    # Check if the request contains JSON data\n    if request.is_json:\n        data = request.get_json()\n\n\t\tif not verify_signature(request.headers.get('x-utila-signature'), request.data, utila_public_key):\n\t\t\treturn 'Invalid signature', 400\n\n        # Check the event type\n        event_type = data.get(\"type\")\n\n        if event_type:\n            # Process based on the event type\n            if event_type == \"TRANSACTION_CREATED\":\n                # handle_transaction_created(data)\n            elif event_type == \"TRANSACTION_STATE_UPDATED\":\n                # handle_transaction_state_updated(data)\n            else:\n                # handle_unknown_event(data)\n\n            # Respond with a success status code (HTTP 200 OK)\n            return '', 200\n\n    # If the request doesn't contain valid JSON data or an unknown event type, respond with an error\n    return 'Invalid request data or event type', 400\n\ndef verify_signature(signature_base64, data, public_key_pem):\n    try:\n        # Load the public key from its PEM-encoded representation\n        public_key = RSA.import_key(public_key_pem)\n\n        # Decode the base64-encoded signature\n        signature = base64.b64decode(signature_base64)\n\n        # Create a SHA-512 hash object and update it with the data\n        h = SHA512.new(data)\n\n        # Verify the signature\n        pss.new(public_key).verify(h, signature)\n\n        return True\n    except (ValueError, TypeError, AssertionError) as e:\n        print(f\"Signature verification failed: {str(e)}\")\n        return False\n\nif __name__ == '__main__':\n    app.run(host='0.0.0.0', port=5000)\n\n```\n\n### TypeScript\n\n```js\nimport { createVerify, constants } from \"crypto\";\nimport express from \"express\";\n\nconst publicKey = `...`;\nconst app = express();\nconst port = 5000;\n\nfunction verifyUtilaSignatureMiddleware(req, res, next) {\n  let data = \"\";\n\n  req.on(\"data\", (chunk) => (data += chunk));\n\n  req.on(\"end\", () => {\n    try {\n      const isValid = verifySignature(\n        req.headers[\"x-utila-signature\"],\n        data,\n        publicKey\n      );\n\n      if (!isValid) {\n        throw new Error(\"Signature verification failed\");\n      }\n\n      req.body = JSON.parse(data);\n      next();\n    } catch (e) {\n      res.status(401).send({ error: e.message });\n    }\n  });\n}\n\napp.post(\"/my-webhook\", verifyUtilaSignatureMiddleware, (req, res) => {\n  console.log(req.body);\n\n  if (req.body.type === \"TEST\") {\n    // Do something when the webhook type is TEST\n  }\n\n  return res.json({ success: true });\n});\n\nfunction verifySignature(signatureBase64, data, publicKey) {\n  try {\n    const signatureBuffer = Buffer.from(signatureBase64, \"base64\");\n    const verifier = createVerify(\"RSA-SHA512\");\n\n    verifier.update(data);\n\n    const isValid = verifier.verify(\n      {\n        key: publicKey,\n        padding: constants.RSA_PKCS1_PSS_PADDING,\n        saltLength: constants.RSA_PSS_SALTLEN_DIGEST,\n      },\n      signatureBuffer\n    );\n\n    return isValid;\n  } catch (error) {\n    return false;\n  }\n}\n\napp.listen(port, () => {\n  console.log(`Webhook server listening at http://localhost:${port}`);\n});\n```\n",
       "name": "Webhooks"
     },
@@ -8117,7 +9969,7 @@
       "name": "Changelog"
     },
     {
-      "name": "GasStations"
+      "name": "WalletLabels"
     }
   ]
 }

@@ -45,7 +45,11 @@ impl From<V2AddressBookEntry> for AddressBookEntry {
             name: ResourceName::parse(e.name.unwrap_or_default()),
             display_name: (!e.display_name.is_empty()).then_some(e.display_name),
             address: e.address,
-            network: NetworkRef::parse(&e.network).map(NetworkId::from),
+            network: e
+                .network
+                .as_deref()
+                .and_then(NetworkRef::parse)
+                .map(NetworkId::from),
             note: e.note.filter(|s| !s.is_empty()),
             tracked: e.tracked.unwrap_or(false),
             associated_wallet: e
@@ -134,7 +138,7 @@ impl From<NewAddressBookEntry> for V2CreateAddressBookEntryRequest {
         Self {
             address: e.address,
             display_name: e.display_name,
-            network: NetworkRef::resource_name(&e.network),
+            network: Some(NetworkRef::resource_name(&e.network)),
             note: e.note,
         }
     }

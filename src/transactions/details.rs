@@ -596,7 +596,7 @@ mod tests {
             StellarMemoType::Hash,
             StellarMemoType::Return,
         ] {
-            let memo: g::Apiv2StellarTransactionMemo = StellarMemo {
+            let memo: g::V2StellarTransactionMemo = StellarMemo {
                 memo_type: ty,
                 data: "d".into(),
             }
