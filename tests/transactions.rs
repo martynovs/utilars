@@ -62,6 +62,61 @@ async fn initiate_sends_exactly_one_detail_and_idempotency_key() {
     assert_eq!(body["requestId"], out.request_id);
 }
 
+/// Initiate a minimal asset transfer (optionally with designated signers) against a mock server
+/// and return the JSON body the client actually sent.
+async fn initiate_body(signers: Option<Vec<UserRef>>) -> serde_json::Value {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v2/vaults/abc/transactions:initiate"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "transaction": null })))
+        .mount(&server)
+        .await;
+    let client = client(&server.uri());
+    let mut builder = client.transactions().asset_transfer(
+        VaultId::new("abc"),
+        AssetTransfer {
+            asset: "native.ethereum-mainnet".into(),
+            source: "vaults/abc/wallets/w1".into(),
+            destination: "0xabc".into(),
+            amount: dec!(1.5),
+            memo: None,
+            sponsor: Some("vaults/abc/wallets/gas".into()),
+            pay_fee_from_amount: None,
+            stellar_memo: None,
+            xrpl_destination_tag: None,
+        },
+    );
+    if let Some(signers) = signers {
+        builder = builder.designated_signers(signers);
+    }
+    builder.send().await.unwrap();
+    let reqs = server.received_requests().await.unwrap();
+    serde_json::from_slice(&reqs[0].body).unwrap()
+}
+
+#[tokio::test]
+async fn initiate_sends_designated_signers_when_set() {
+    let body = initiate_body(Some(vec![
+        UserRef::new("co-signer@example.com"),
+        UserRef::new("a3e4f5"),
+    ]))
+    .await;
+    assert_eq!(
+        body["designatedSigners"],
+        json!(["users/co-signer@example.com", "users/a3e4f5"])
+    );
+}
+
+#[tokio::test]
+async fn initiate_omits_designated_signers_when_unset_or_empty() {
+    // Never called: today's behaviour.
+    let unset = initiate_body(None).await;
+    assert!(unset.get("designatedSigners").is_none());
+    // Called with an empty list: still not sent.
+    let empty = initiate_body(Some(Vec::new())).await;
+    assert!(empty.get("designatedSigners").is_none());
+}
+
 #[tokio::test]
 async fn initiate_request_id_override_is_used() {
     let server = MockServer::start().await;

@@ -444,6 +444,7 @@ impl<'a> Transactions<'a> {
             external_id: None,
             validate_only: false,
             run_simulation: false,
+            designated_signers: Vec::new(),
         }
     }
 
@@ -713,6 +714,7 @@ pub struct InitiateBuilder<'a> {
     external_id: Option<String>,
     validate_only: bool,
     run_simulation: bool,
+    designated_signers: Vec<UserRef>,
 }
 
 impl InitiateBuilder<'_> {
@@ -741,6 +743,16 @@ impl InitiateBuilder<'_> {
         self.run_simulation = v;
         self
     }
+    /// Designate specific signers (build each with [`UserRef::new`], from a user id or email).
+    /// An empty list (the default) leaves `designatedSigners` out of the request.
+    ///
+    /// Needed when a co-signer must approve every signature a request produces — e.g. a
+    /// sponsored transfer also creates an EIP-7702 delegation, which the vault policy assigns
+    /// to no one unless the signer is designated here.
+    pub fn designated_signers(mut self, signers: Vec<UserRef>) -> Self {
+        self.designated_signers = signers;
+        self
+    }
 
     pub async fn send(self) -> Result<Initiated> {
         let request_id = self
@@ -756,7 +768,11 @@ impl InitiateBuilder<'_> {
             // convention and keeps the request body minimal).
             validate_only: self.validate_only.then_some(true),
             run_simulation: self.run_simulation.then_some(true),
-            designated_signers: Vec::new(),
+            designated_signers: self
+                .designated_signers
+                .iter()
+                .map(ToString::to_string)
+                .collect(),
             annotations: std::collections::HashMap::new(),
             skip_initiator_approval: None,
             expire_time: None,

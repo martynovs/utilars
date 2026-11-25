@@ -44,7 +44,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use anyhow::{Context as _, Result};
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 use futures::TryStreamExt as _;
 use rust_decimal::Decimal;
 use serde_json::{json, Value};
@@ -52,9 +52,35 @@ use utilars::webhook::Event;
 use utilars::{
     Amount, AssetId, AssetRef, AssetTransfer, Balance, EvmTransaction, InitiateBuilder, Network,
     NetworkId, ParseRef, ResolvedAsset, SignerSource, SolanaRaw, StellarRaw, SuiRaw, Transaction,
-    TransactionId, TronTriggerSmartContract, UtilaClient, Vault, VaultId, Wallet, WalletAddress,
-    WalletId, XrplRaw,
+    TransactionId, TronTriggerSmartContract, UserRef, UtilaClient, Vault, VaultId, Wallet,
+    WalletAddress, WalletId, XrplRaw,
 };
+
+/// Who must sign the transactions this command initiates. Shared by `transfer` and every
+/// `send <network>`; the environment fallback lives here (the application reads the
+/// environment, not the library), and an explicit flag always wins over it.
+#[derive(Args)]
+struct SignerArgs {
+    /// Designated signer — an email or a user id (`users/` is added). Repeat the flag for
+    /// several. Falls back to `UTILA_DESIGNATED_SIGNER` (comma-separated) when no flag is given.
+    #[arg(
+        long = "designated-signer",
+        value_name = "USER",
+        env = "UTILA_DESIGNATED_SIGNER",
+        value_delimiter = ',',
+        global = true
+    )]
+    designated_signers: Vec<String>,
+}
+
+impl SignerArgs {
+    fn into_refs(self) -> Vec<UserRef> {
+        self.designated_signers
+            .into_iter()
+            .map(UserRef::new)
+            .collect()
+    }
+}
 
 /// Accept an asset id with or without the `assets/` prefix — the bare segment is canonical, but a
 /// pasted resource name (`assets/native.ethereum-mainnet`) is normalized to it.
@@ -149,6 +175,8 @@ enum Command {
         /// EVM-only: pay the network fee out of the transfer amount.
         #[arg(long)]
         pay_fee_from_amount: bool,
+        #[command(flatten)]
+        signers: SignerArgs,
     },
     /// Send a network-specific transaction you build yourself — one example per network.
     ///
@@ -156,6 +184,8 @@ enum Command {
     /// a Tron contract call, or a pre-serialized Solana/Stellar/Sui/XRPL blob) and it signs
     /// and submits it. Use when `transfer` can't express what you need; otherwise use `transfer`.
     Send {
+        #[command(flatten)]
+        signers: SignerArgs,
         #[command(subcommand)]
         kind: SendKind,
     },
@@ -574,6 +604,7 @@ async fn run(client: &UtilaClient, command: Command, json: bool) -> Result<()> {
             note,
             sponsor,
             pay_fee_from_amount,
+            signers,
         } => {
             let mut builder = client.transactions().asset_transfer(
                 VaultId::new(vault),
@@ -593,9 +624,9 @@ async fn run(client: &UtilaClient, command: Command, json: bool) -> Result<()> {
             if let Some(note) = note {
                 builder = builder.note(note);
             }
-            submit(builder).await?;
+            submit(builder.designated_signers(signers.into_refs())).await?;
         }
-        Command::Send { kind } => run_send(client, kind).await?,
+        Command::Send { signers, kind } => run_send(client, kind, signers.into_refs()).await?,
         // Normally dispatched in `main` before a client is built (no creds needed); handled
         // here too so the match is exhaustive without a panic.
         Command::VerifyWebhook { signature } => verify_webhook(&signature)?,
@@ -610,7 +641,11 @@ async fn run(client: &UtilaClient, command: Command, json: bool) -> Result<()> {
     clippy::too_many_lines,
     reason = "flat per-network dispatch; one arm per network reads clearer than indirection"
 )]
-async fn run_send(client: &UtilaClient, kind: SendKind) -> Result<()> {
+async fn run_send(
+    client: &UtilaClient,
+    kind: SendKind,
+    designated_signers: Vec<UserRef>,
+) -> Result<()> {
     let builder = match kind {
         SendKind::Evm {
             vault,
@@ -709,7 +744,7 @@ async fn run_send(client: &UtilaClient, kind: SendKind) -> Result<()> {
             )
         }
     };
-    submit(builder).await
+    submit(builder.designated_signers(designated_signers)).await
 }
 
 /// Submit a prepared initiate builder and print the idempotency key + resulting transaction.
@@ -954,6 +989,11 @@ fn transaction_json(t: Transaction) -> Value {
         "kind": t.kind.map(|k| format!("{k:?}")),
         "hash": t.hash,
         "created": t.create_time.map(|x| x.to_rfc3339()),
+        "designated_signers": t
+            .designated_signers
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
     })
 }
 
