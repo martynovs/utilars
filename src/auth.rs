@@ -1,3 +1,4 @@
+use std::future::Future;
 use std::time::Duration;
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD as B64;
@@ -28,9 +29,13 @@ struct LocalRsaSigner<'a> {
 }
 
 impl Signer for LocalRsaSigner<'_> {
-    async fn sign(&self, signing_input: &[u8]) -> Result<String> {
-        jsonwebtoken::crypto::sign(signing_input, self.key, Algorithm::RS256)
-            .map_err(|e| ApiError::Auth(format!("sign failed: {e}")))
+    // In-process signing is synchronous: hand back an already-ready future rather than an
+    // `async fn` with no `.await` (clippy::unused_async_trait_impl).
+    fn sign(&self, signing_input: &[u8]) -> impl Future<Output = Result<String>> {
+        std::future::ready(
+            jsonwebtoken::crypto::sign(signing_input, self.key, Algorithm::RS256)
+                .map_err(|e| ApiError::Auth(format!("sign failed: {e}"))),
+        )
     }
 }
 
@@ -246,15 +251,21 @@ impl TokenManager {
         .await
     }
 
+    /// Mirrors the async `aws` variant (so the call site is feature-agnostic) but has nothing
+    /// to await: it always fails, so it returns an already-ready future.
     #[cfg(not(feature = "aws"))]
     #[expect(
-        clippy::unused_async,
-        reason = "mirrors the async `aws` variant so the call site is feature-agnostic"
+        clippy::unused_self,
+        reason = "same signature as the `aws` variant, which needs `self` for its KMS client"
     )]
-    async fn sign_kms(&self, key: &KmsKey, _signing_input: &[u8]) -> Result<String> {
-        Err(ApiError::Auth(format!(
+    fn sign_kms(
+        &self,
+        key: &KmsKey,
+        _signing_input: &[u8],
+    ) -> impl Future<Output = Result<String>> {
+        std::future::ready(Err(ApiError::Auth(format!(
             "KMS signing for {key} requires the `aws` feature (build with `--features aws`)"
-        )))
+        ))))
     }
 
     /// The shared KMS client, built (once) from the default AWS config with the ARN's region.
@@ -330,6 +341,26 @@ mod tests {
             "sa@vault-x.utilaserviceaccount.io",
             SignerSource::local_pem(TEST_KEY).unwrap(),
         )
+    }
+
+    #[test]
+    fn local_pem_rejects_invalid_pem() {
+        let err = SignerSource::local_pem(b"not a pem").unwrap_err();
+        assert!(
+            matches!(&err, ApiError::Auth(m) if m.contains("invalid RSA private key")),
+            "got: {err}"
+        );
+    }
+
+    #[tokio::test]
+    async fn local_signer_reports_a_key_that_cannot_sign_rs256() {
+        // An HMAC secret is a valid `EncodingKey` but the wrong family for RS256.
+        let key = EncodingKey::from_secret(b"not-an-rsa-key");
+        let err = LocalRsaSigner { key: &key }.sign(b"x.y").await.unwrap_err();
+        assert!(
+            matches!(&err, ApiError::Auth(m) if m.contains("sign failed")),
+            "got: {err}"
+        );
     }
 
     #[test]

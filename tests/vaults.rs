@@ -44,6 +44,23 @@ async fn vaults_list_authenticates_and_parses() {
 }
 
 #[tokio::test]
+async fn vaults_list_without_paging_sends_no_paging_params() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/v2/vaults"))
+        .and(query_param_is_missing("pageSize"))
+        .and(query_param_is_missing("pageToken"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "vaults": [] })))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let page = client(&server.uri()).vaults().list().send().await.unwrap();
+    assert!(page.vaults.is_empty());
+    assert_eq!(page.next_page_token, None);
+}
+
+#[tokio::test]
 async fn vaults_stream_walks_all_pages() {
     let server = MockServer::start().await;
     // page 1 (no pageToken) → nextPageToken=page2

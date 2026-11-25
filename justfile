@@ -11,6 +11,28 @@ crap_threshold := shell("v=$(grep -E '^threshold[[:space:]]*=' .cargo-crap.toml 
 clippy:
   @cargo clippy --workspace --all-targets
 
+# Run every job of .github/workflows/ci.yml locally, with the same flags (RUSTFLAGS=-D warnings
+# turns every warning into an error). Run this before pushing; keep it in step with ci.yml.
+# Needs the MSRV toolchain: `rustup toolchain install 1.91.0 --profile minimal`.
+ci:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  mkdir -p tmp
+  export RUSTFLAGS="-D warnings"
+  echo "== rustfmt";        cargo fmt --all --check
+  echo "== clippy";         cargo clippy --workspace --all-targets
+  echo "== test";           cargo test --workspace
+  echo "== msrv (1.91)";    RUSTFLAGS="" rustup run 1.91.0 cargo check -p utilars --locked
+  echo "== codegen drift"
+  # Regenerate hermetically and compare with what is on disk now (CI compares with the commit).
+  cp src/generated.rs tmp/generated.before.rs
+  cp openapi/utila.v2.meta.json tmp/meta.before.json
+  RUSTFLAGS="" cargo xtask gen
+  cmp src/generated.rs tmp/generated.before.rs
+  cmp openapi/utila.v2.meta.json tmp/meta.before.json
+  echo "== crap + coverage"; just gate
+  echo "== all CI jobs passed"
+
 # Run the demo CLI (binary `utilars`). Reads creds from env; pass args after the recipe, e.g. `just cli vaults`.
 cli *args:
   @cargo run --quiet --example utilars -- {{ args }}

@@ -7,7 +7,6 @@ license = "Apache-2.0 OR MIT"
 description = "Rust client for the Utila v2 API"
 readme = "README.md"
 repository = "https://github.com/martynovs/utilars"
-homepage = "https://github.com/martynovs/utilars"
 documentation = "https://docs.rs/utilars"
 # Guard against an accidental `cargo publish`. Flip to `publish = true` (or delete this
 # line) only when you intend to release to crates.io — see the "Releasing" steps in the PR/README.

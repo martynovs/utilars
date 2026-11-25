@@ -45,7 +45,7 @@ async fn initiate_sends_exactly_one_detail_and_idempotency_key() {
         .await
         .unwrap();
 
-    assert!(!out.request_id.is_empty());
+    assert_ne!(out.request_id, "");
     assert_eq!(
         out.transaction.unwrap().name.to_string(),
         "vaults/abc/transactions/t1"
